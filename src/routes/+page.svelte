@@ -7,6 +7,10 @@
     let wallImgURL;
     let holds:Hold[];
 
+    $: if (wallImgFiles) {
+        handleWallImgSubmit();
+    }
+
     async function handleWallImgSubmit() {
         holds = [];
         if (wallImgURL) { URL.revokeObjectURL(wallImgURL); }
@@ -20,6 +24,7 @@
             });
             const result = await response.json();
             for (let i = 0; i < result["confidences"].length; i++) {
+                if (result["confidences"][i] < 0.5) { continue; }
                 holds.push({
                     id: String(i),
                     left: result["boxes"][i][0],
@@ -50,7 +55,7 @@
     type="file"
     accept="image/png, image/jpeg, image/webp, image/tiff"
     bind:files={wallImgFiles}/>
-<button on:click={handleWallImgSubmit}>Test</button>
+<!-- <button on:click={handleWallImgSubmit}>Test</button> -->
 
 {#if wallImgURL && holds}
     <WallEditor wallImgURL={wallImgURL} holds={holds}/>

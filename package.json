@@ -31,6 +31,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@xenova/transformers": "^2.15.0",
 		"panzoom": "^9.4.3"
 	}
 }

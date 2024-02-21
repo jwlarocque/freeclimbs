@@ -5,4 +5,6 @@ export type Hold = {
     right: number;
     bottom: number;
     confidence?: number;
+    confirmed?: boolean;
+    mask?: any;
 }
