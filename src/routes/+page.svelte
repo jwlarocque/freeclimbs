@@ -34,6 +34,7 @@
                     confidence: result["confidences"][i]
                 });
             }
+            holds.sort((a, b) => a.top - b.top);
             wallImgURL = URL.createObjectURL(wallImgFiles[0]);
         } catch (error) {
             console.error(error);

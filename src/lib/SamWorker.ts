@@ -14,10 +14,13 @@ export class SegmentAnythingSingleton {
         if (!this.model) {
             this.model = SamModel.from_pretrained(this.model_id, {
                 quantized: this.quantized,
+                revision: 'boxes',
             });
         }
         if (!this.processor) {
-            this.processor = AutoProcessor.from_pretrained(this.model_id);
+            this.processor = AutoProcessor.from_pretrained(this.model_id, {
+                revision: 'boxes',
+            });
         }
 
         return Promise.all([this.model, this.processor]);
@@ -32,6 +35,7 @@ self.onmessage = async (e) => {
     const [model, processor] = await SegmentAnythingSingleton.getInstance();
     if (!ready) {
         // Indicate that we are ready to accept requests
+        console.log("worker ready");
         ready = true;
         self.postMessage({
             type: 'ready',
@@ -45,59 +49,63 @@ self.onmessage = async (e) => {
 
     } else if (type === 'segment') {
         // Indicate that we are starting to segment the image
+        console.log("segmenting");
         self.postMessage({
             type: 'segment_result',
             data: 'start',
         });
 
         // Read the image and recompute image embeddings
-        const image = await RawImage.read(e.data.data);
+        const image = await RawImage.read(data);
         image_inputs = await processor(image);
-        image_embeddings = await model.get_image_embeddings(image_inputs)
+        image_embeddings = await model.get_image_embeddings(image_inputs);
 
         // Indicate that we have computed the image embeddings, and we are ready to accept decoding requests
+        console.log("done segmenting");
         self.postMessage({
             type: 'segment_result',
             data: 'done',
         });
 
     } else if (type === 'decode') {
-        // Prepare inputs for decoding
-        const reshaped = image_inputs.reshaped_input_sizes[0];
-        const points = data.map(x => [x.point[0] * reshaped[1], x.point[1] * reshaped[0]])
-        const labels = data.map(x => BigInt(x.label));
-
-        const input_points = new Tensor(
-            'float32',
-            points.flat(Infinity),
-            [1, 1, points.length, 2],
-        )
-        const input_labels = new Tensor(
-            'int64',
-            labels.flat(Infinity),
-            [1, 1, labels.length],
-        )
-
-        // Generate the mask
+        console.log("decoding");
+        const {bbox, hold_i} = data;
+        let input_boxes = [[bbox]];
         const outputs = await model({
             ...image_embeddings,
-            input_points,
-            input_labels,
-        })
-
-        // Post-process the mask
-        const masks = await processor.post_process_masks(
-            outputs.pred_masks,
-            image_inputs.original_sizes,
-            image_inputs.reshaped_input_sizes,
-        );
+            input_points: null,
+            input_labels: null,
+            input_boxes: processor.reshape_input_points(
+                input_boxes,
+                image_inputs.original_sizes,
+                image_inputs.reshaped_input_sizes,
+                true
+            )
+        });
+        const masks = (
+            await processor.post_process_masks(
+                outputs.pred_masks,
+                image_inputs.original_sizes,
+                image_inputs.reshaped_input_sizes))[0][0];
+        
+        let bestMask = masks[0];
+        let bestScore = outputs.iou_scores.data[0];
+        for (let i = 1; i < masks.dims[1]; i++) {
+            if (outputs.iou_scores.data[i] > bestScore) {
+                bestMask = masks[i];
+                bestScore = outputs.iou_scores.data[i];
+            }
+        }
+        const imgMask = bestMask.mul(255).unsqueeze(0);
 
         // Send the result back to the main thread
+        console.log("done decoding");
         self.postMessage({
             type: 'decode_result',
             data: {
-                mask: RawImage.fromTensor(masks[0][0]),
-                scores: outputs.iou_scores.data,
+                hold_i: hold_i,
+                mask: await RawImage.fromTensor(imgMask).toBlob(),
+                score: bestScore,
             },
         });
 

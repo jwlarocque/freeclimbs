@@ -1,9 +1,11 @@
 <script lang="ts">
     import createPanZoom from "panzoom";
     import { env, SamModel, AutoProcessor, RawImage, Tensor } from "@xenova/transformers";
+    import { cat, stack } from "@xenova/transformers";
 
     import type { Hold } from "$lib/Hold";
 	import Page from "../routes/+page.svelte";
+    import SamWorker from "$lib/SamWorker?worker";
 
     export let wallImgURL;
     export let holds:Hold[];
@@ -18,6 +20,27 @@
     };
     const RESIZE_HANDLE_RADIUS = 7;
 
+    // TODO: consider multithreading
+    const segmentationWorker = new SamWorker();
+    let segmentationWorkerReady = false;
+    let segmentationWorkerEmbedded = false;
+    segmentationWorker.onmessage = async (e) => {
+        const {type, data} = e.data;
+        if (type === 'ready') {
+            segmentationWorkerReady = true;
+        } else if (type === 'segment_result') {
+            if (data == "start") {
+                segmentationWorkerEmbedded = false;
+            } else if (data == "done") {
+                segmentationWorkerEmbedded = true;
+            }
+        } else if (type === 'decode_result') {
+            const {hold_i, mask, score} = data;
+            holds[hold_i].mask = mask;
+            drawMask(hold_i);
+        }
+    };
+
     let holdsOverlayContainer;
     let holdsOverlay;
     let segmentationCanvas;
@@ -27,10 +50,7 @@
     let clickDisabled = false;
     let selectedHold = null;
     let selectedHoldi;
-    $: if (holds && selectedHold) {
-        selectedHoldi = holds.findIndex((h) => h.id == selectedHold.id); // TODO: awk
-    }
-    
+   
     $: if (wallImgLoaded && panzoom) {
         panzoom.zoomTo(0, 0, holdsOverlay.clientWidth / wallImg.width);
     }
@@ -73,8 +93,12 @@
             let bdy = ((b.top + b.bottom) / 2 - event.offsetY) ** 2;
             return (adx + ady) - (bdx + bdy);
         });
-        console.log(candidates);
         selectedHold = candidates[0];
+        selectedHoldi = holds.findIndex((h) => h.id == selectedHold.id); // TODO: awk
+
+        if (selectedHold?.mask) {
+            drawMask(selectedHoldi);
+        }
     }
 
     function handleHoldKeypress(hold) {
@@ -86,7 +110,9 @@
         e.preventDefault();
         e.stopPropagation();
         resizingDir = dir;
-        resizeHold(e.offsetX, e.offsetY);
+        if (e?.offsetX) {
+            resizeHold(e.offsetX, e.offsetY);
+        }
     }
 
     function handleResizeMouseMove(e) {
@@ -103,6 +129,18 @@
             holds[selectedHoldi].right = Math.max(x, holds[selectedHoldi].left + 5);
         } else if (resizingDir == "bottom") {
             holds[selectedHoldi].bottom = Math.max(y, holds[selectedHoldi].top + 5);
+        }
+    }
+
+    async function handleResizeEnd(e) {
+        resizingDir = null;
+        // if (selectedHoldi) {
+        //     selectedHoldi = null;
+        //     selectedHold = null;
+        // }
+        if (imageEmbeddings && selectedHold) {
+            await segmentHold(imageEmbeddings, selectedHold);
+            drawMask(selectedHoldi);
         }
     }
 
@@ -138,7 +176,29 @@
         });
         console.log(holds[holds.length - 1]);
         holds = holds;
+        selectedHoldi = holds.length - 1;
         selectedHold = holds[holds.length - 1];
+    }
+
+    async function segmentHolds() {
+        if (!wallImgURL) {
+            return;
+        }
+        // await segmentationWorker.postMessage({type: 'reset'});
+        // segmentationWorkerEmbedded = false;
+        if (!segmentationWorkerEmbedded) {
+            await segmentationWorker.postMessage({type: 'segment', data: wallImgURL});
+            return;
+        }
+        for (let i = 0; i < holds.length; i++) {
+            await segmentationWorker.postMessage({
+                type: 'decode',
+                data: {
+                    bbox: [holds[i].left, holds[i].top, holds[i].right, holds[i].bottom],
+                    hold_i: i
+                }
+            });
+        }
     }
 
     let maskData;
@@ -147,36 +207,81 @@
     let imageEmbeddings;
     let model;
     let processor;
-    async function segmentHolds() {
+    let segmented = false;
+    async function oldsegmentHolds() {
+        if (segmented) {
+            return;
+        }
+        segmented = true;
         if (!model) {
-            model = await SamModel.from_pretrained("Xenova/slimsam-50-uniform");
+            model = await SamModel.from_pretrained(
+                "Xenova/slimsam-77-uniform", {
+                    revision: 'boxes',
+            });
         }
         if (!processor) {
-            processor = await AutoProcessor.from_pretrained("Xenova/slimsam-50-uniform");
+            processor = await AutoProcessor.from_pretrained(
+                "Xenova/slimsam-77-uniform", {
+                    revision: 'boxes',
+            });
         }
         if (!imageEmbeddings) {
+            let embed_time_start = performance.now();
             const rawImage = await RawImage.read(wallImgURL);
+            console.log(rawImage);
             imageInputs = await processor(rawImage);
+            console.log(imageInputs);
             imageEmbeddings = await model.get_image_embeddings(imageInputs);
+            console.log("embed time: ", performance.now() - embed_time_start, " ms");
         }
-        let inputPoints = [];
+
+        let segment_time_start = performance.now();
         for (let i = 0; i < holds.length; i++) {
-            let centerX = (holds[i].left + holds[i].right) / 2;
-            let centerY = (holds[i].top + holds[i].bottom) / 2;
-            inputPoints.push([[centerX, centerY]]);
+            await segmentHold(imageEmbeddings, holds[i]);
+            drawMask(i);
         }
-        const outputs = await model({...imageEmbeddings, input_points: processor.reshape_input_points(inputPoints, imageInputs.original_sizes, imageInputs.reshaped_input_sizes)});
-        const masks = await processor.post_process_masks(outputs.pred_masks, imageInputs.original_sizes, imageInputs.reshaped_input_sizes);
-        maskData = masks[0];
-        scores = outputs.iou_scores.data;
-        // drawMasks();
+        console.log("segment time: ", performance.now() - segment_time_start, " ms");
     }
 
-    $: if (selectedHoldi != null && maskData && selectedHoldi < maskData.dims[0]) {
-        drawMask(selectedHoldi);
+    async function segmentHold(imageEmbeddings, hold) {
+        let input_boxes = [[[hold.left, hold.top, hold.right, hold.bottom]]];
+        const outputs = await model({
+            ...imageEmbeddings,
+            input_points: null,
+            input_labels: null,
+            input_boxes: processor.reshape_input_points(
+                input_boxes,
+                imageInputs.original_sizes,
+                imageInputs.reshaped_input_sizes,
+                true
+            )
+        });
+        const masks = (await processor.post_process_masks(outputs.pred_masks, imageInputs.original_sizes, imageInputs.reshaped_input_sizes))[0][0];
+        let bestMask = masks[0];
+        let bestScore = outputs.iou_scores.data[0];
+        for (let i = 1; i < masks.dims[1]; i++) {
+            if (outputs.iou_scores.data[i] > bestScore) {
+                bestMask = masks[i];
+                bestScore = outputs.iou_scores.data[i];
+            }
+        }
+        // create image from bestMask tensor (tensors are transformers.js tensors, _not_ tensorflow tensors)
+        let imgMask = bestMask.mul(255).unsqueeze(0);
+        let image = await RawImage.fromTensor(imgMask);
+        hold.mask = await image.toBlob();
+        // draw image
+        // segmentationCanvas.width = wallImg.width;
+        // segmentationCanvas.height = wallImg.height;
+        // let ctx = segmentationCanvas.getContext("2d");
+        // console.log(image.toCanvas());
+        // ctx.drawImage(image.toCanvas(), 0, 0);
     }
 
-    $: if (selectedHoldi == null && maskData && segmentationCanvas) {
+    // $: if (selectedHoldi != null && holds[selectedHoldi] && holds[selectedHoldi]?.mask) {
+    //     drawMask(selectedHoldi);
+    // }
+
+    $: if (selectedHoldi == null && segmentationCanvas) {
         const ctx = segmentationCanvas.getContext("2d");
         ctx.clearRect(0, 0, segmentationCanvas.width, segmentationCanvas.height);
     }
@@ -189,31 +294,28 @@
         segmentationCanvas.height = wallImg.height;
         const ctx = segmentationCanvas.getContext("2d");
         ctx.clearRect(0, 0, segmentationCanvas.width, segmentationCanvas.height);
-        const imageData = ctx.createImageData(segmentationCanvas.width, segmentationCanvas.height);
-        let bestMask = maskData[segment_i][0];
-        let bestMaski = 0;
-        for (let j = 1; j < maskData.dims[1]; j++) {
-            if (scores[segment_i][j] > scores[segment_i][bestMaski]) {
-                bestMask = maskData[segment_i][j];
-                bestMaski = j;
-            }
-        }
-        let mask = bestMask.tolist();
-        for (let i = 0; i < imageData.data.length / 4; i += 1) {
-            // TODO: this is dumb
-            let x = i % segmentationCanvas.width;
-            let y = Math.floor(i / segmentationCanvas.width);
-            if (x < holds[selectedHoldi].left || x > holds[selectedHoldi].right || y < holds[selectedHoldi].top || y > holds[selectedHoldi].bottom) {
-                continue;
-            }
-            if (mask[y][x] > 0) {
-                imageData.data[i * 4 + 0] = 0; // r
-                imageData.data[i * 4 + 1] = 121; // g
-                imageData.data[i * 4 + 2] = 180; // b
-                imageData.data[i * 4 + 3] = 127; // a
-            }
-        }
-        ctx.putImageData(imageData, 0, 0);
+        ctx.globalAlpha = 0.2;
+        let img = new Image;
+        img.src = URL.createObjectURL(holds[segment_i].mask);
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+        };
+        // const imageData = ctx.createImageData(segmentationCanvas.width, segmentationCanvas.height);
+        // for (let i = 0; i < imageData.data.length / 4; i += 1) {
+        //     // TODO: this is dumb
+        //     let x = i % segmentationCanvas.width;
+        //     let y = Math.floor(i / segmentationCanvas.width);
+        //     // if (x < holds[selectedHoldi].left || x > holds[selectedHoldi].right || y < holds[selectedHoldi].top || y > holds[selectedHoldi].bottom) {
+        //     //     continue;
+        //     // }
+        //     if (holds[segment_i].mask[y][x] > 0) {
+        //         imageData.data[i * 4 + 0] = 0; // r
+        //         imageData.data[i * 4 + 1] = 121; // g
+        //         imageData.data[i * 4 + 2] = 180; // b
+        //         imageData.data[i * 4 + 3] = 127; // a
+        //     }
+        // }
+        // ctx.putImageData(imageData, 0, 0);
     }
 
     async function drawMasks() {
@@ -352,12 +454,13 @@
         <div
             id="holdsUI"
             bind:this={holdsOverlay}
-            on:mousedown={(e) => {selectedHold = null; selectedHoldi = null;}}
+            on:pointerdown={(e) => {selectedHold = null; selectedHoldi = null;}}
             on:pointermove={(e) => {if (resizingDir) {handleResizeMouseMove(e);};}}
-            on:mouseup={(e) => {resizingDir = null;}}
-            on:touchend={(e) => {resizingDir = null;}}
-            on:touchcancel={(e) => {resizingDir = null;}}
-        >
+            on:pointerup={handleResizeEnd}>
+            <!-- on:touchend={handleResizeEnd}
+            on:mouseup={handleResizeEnd}
+            on:touchcancel={handleResizeEnd}
+        > -->
             <img bind:this={wallImg} src={wallImgURL} alt="the climbing wall you uploaded"/>
             <canvas bind:this={segmentationCanvas}></canvas>
             <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="100%" height="100%" overflow="visible">
@@ -370,7 +473,7 @@
                         height="{hold.bottom - hold.top}"
                         tabindex="0"
                         stroke="red"
-                        fill="{selectedHold && selectedHold.id == hold.id ? 'rgba(1,0,0,0.3)' : 'rgba(0,0,0,0.0)'}"
+                        fill="{selectedHold && selectedHold.id == hold.id ? 'rgba(1,0,0,0.0)' : 'rgba(0,0,0,0.0)'}"
                         stroke-width="1"
                         x="{hold.left}"
                         y="{hold.top}"
