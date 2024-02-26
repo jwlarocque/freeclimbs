@@ -31,6 +31,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@techstark/opencv-js": "^4.9.0-release.2",
 		"@xenova/transformers": "github:xenova/transformers.js#sam-box-inputs",
 		"panzoom": "^9.4.3"
 	}

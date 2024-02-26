@@ -26,7 +26,7 @@
             for (let i = 0; i < result["confidences"].length; i++) {
                 if (result["confidences"][i] < 0.5) { continue; }
                 holds.push({
-                    id: String(i),
+                    id: i,
                     left: result["boxes"][i][0],
                     top: result["boxes"][i][1],
                     right: result["boxes"][i][2],

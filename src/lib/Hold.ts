@@ -1,5 +1,5 @@
 export type Hold = {
-    id: string;
+    id: number;
     left: number;
     top: number;
     right: number;

@@ -2,6 +2,7 @@
     import createPanZoom from "panzoom";
     import { env, SamModel, AutoProcessor, RawImage, Tensor } from "@xenova/transformers";
     import { cat, stack } from "@xenova/transformers";
+    import cv from "@techstark/opencv-js";
 
     import type { Hold } from "$lib/Hold";
 	import Page from "../routes/+page.svelte";
@@ -20,30 +21,114 @@
     };
     const RESIZE_HANDLE_RADIUS = 7;
 
-    // TODO: consider multithreading
-    const segmentationWorker = new SamWorker();
-    let segmentationWorkerReady = false;
-    let segmentationWorkerEmbedded = false;
-    segmentationWorker.onmessage = async (e) => {
-        const {type, data} = e.data;
-        if (type === 'ready') {
-            segmentationWorkerReady = true;
-        } else if (type === 'segment_result') {
-            if (data == "start") {
-                segmentationWorkerEmbedded = false;
-            } else if (data == "done") {
-                segmentationWorkerEmbedded = true;
+    let numWorkersText = "";
+
+    // TODO: this decodeId system is insane
+    // TODO: discard old decodes by id when they're no longer needed
+    //       (this may be complicated)
+    // TODO: why do I have this weird singleton thing?
+    class SamHandler {
+        workers: Worker[] = [];
+        workersReady: boolean[] = [];
+        workersEmbedded: string[] = [];
+        decodeId = 0;
+        decodeQueue: any[] = [];
+        decodesInFlight: number[] = [];
+
+        constructor() {
+            // use at least 1 worker
+            // use no more than 1 worker per 2GB of memory
+            // don't use more than 4 workers
+            const memoryWorkerLimit = Math.max(1, Math.floor(Math.min(navigator?.deviceMemory || 2, 8) / 2));
+            let numWorkers = Math.min(Math.max(navigator.hardwareConcurrency - 1, 1), memoryWorkerLimit);
+            numWorkersText = `${numWorkers} workers`;
+            for (let i = 0; i < numWorkers; i++) {
+                let worker = new SamWorker();
+                worker.onmessage = async (e) => {
+                    const {type, data} = e.data;
+                    if (type === 'ready') {
+                        this.workersReady[i] = true;
+                    } else if (type === 'segment_result') {
+                        if (data == "start") {
+                            this.workersEmbedded[i] = "running";
+                        } else if (data == "done") {
+                            this.workersEmbedded[i] = "done";
+                            this.decodeFromQueue(i);
+                        }
+                    } else if (type === 'decode_result') {
+                        const {decode_id, hold_i, mask, score} = data;
+                        let decodeIndex = this.decodesInFlight.indexOf(decode_id);
+                        if (decodeIndex != -1) {
+                            this.decodesInFlight.splice(decodeIndex, 1);
+                            holds[hold_i].mask = mask;
+                            // drawMask(hold_i);
+                        }
+                        this.decodeFromQueue(i);
+                    }
+                }
+                this.workers.push(worker);
+                this.workersReady.push(false);
+                this.workersEmbedded.push("not_started");
             }
-        } else if (type === 'decode_result') {
-            const {hold_i, mask, score} = data;
-            holds[hold_i].mask = mask;
-            drawMask(hold_i);
         }
-    };
+
+        decodeFromQueue(worker_i) {
+            if (this.workersEmbedded[worker_i] == "done"
+                && this.decodeQueue.length > 0
+            ) {
+                let hold_i = this.decodeQueue.shift();
+                let thisDecodeId = this.decodeId++;
+                this.decodesInFlight.push(thisDecodeId);
+                this.workers[worker_i].postMessage({
+                    type: 'decode',
+                    data: {
+                        decode_id: thisDecodeId,
+                        bbox: [
+                            holds[hold_i].left,
+                            holds[hold_i].top,
+                            holds[hold_i].right,
+                            holds[hold_i].bottom],
+                        hold_i: hold_i
+                    }
+                });
+            }
+        }
+
+        // for simplicity, just have each worker compute their own embeddings
+        // TODO: consider computing embeddings once and passing them to all workers
+        segment(imgURL) {
+            this.workers.forEach((worker, i) => {
+                if (this.workersEmbedded[i] == "not_started") {
+                    worker.postMessage({
+                        type: 'segment',
+                        data: imgURL,
+                    });
+                }
+            });
+        }
+
+        decode() {
+            this.decodeQueue = [];
+            holds.forEach((hold, i) => {
+                if (!hold.mask) {
+                    this.decodeQueue.push(i);
+                }
+            });
+            this.workers.forEach((worker, i) => {
+                this.decodeFromQueue(i);
+            });
+        }
+
+        decodeOne(hold_i) {
+            this.decodeQueue.push(hold_i);
+            this.decodeFromQueue(0);
+        }
+    }
+
+    let samHandler = new SamHandler();
 
     let holdsOverlayContainer;
     let holdsOverlay;
-    let segmentationCanvas;
     let wallImg;
     let wallImgLoaded = false;
     let panzoom;
@@ -93,12 +178,11 @@
             let bdy = ((b.top + b.bottom) / 2 - event.offsetY) ** 2;
             return (adx + ady) - (bdx + bdy);
         });
+        console.log(candidates);
         selectedHold = candidates[0];
         selectedHoldi = holds.findIndex((h) => h.id == selectedHold.id); // TODO: awk
-
-        if (selectedHold?.mask) {
-            drawMask(selectedHoldi);
-        }
+        console.log(selectedHoldi);
+        console.log(selectedHold.id);
     }
 
     function handleHoldKeypress(hold) {
@@ -134,13 +218,8 @@
 
     async function handleResizeEnd(e) {
         resizingDir = null;
-        // if (selectedHoldi) {
-        //     selectedHoldi = null;
-        //     selectedHold = null;
-        // }
-        if (imageEmbeddings && selectedHold) {
-            await segmentHold(imageEmbeddings, selectedHold);
-            drawMask(selectedHoldi);
+        if (selectedHoldi) {
+            samHandler.decodeOne(selectedHoldi);
         }
     }
 
@@ -168,190 +247,23 @@
         let panX = transform.x;
         let panY = transform.y;
         holds.push({
-            id: String(holds.length),
+            id: Math.max(...holds.map((h) => h.id)) + 1,
             left: -1/zoom * (panX - containerRect.width * 0.2),
             top: -1/zoom * (panY - containerRect.height * 0.2),
             right: -1/zoom * (panX - containerRect.width * 0.8),
             bottom: -1/zoom * (panY - containerRect.height * 0.8)
         });
-        console.log(holds[holds.length - 1]);
         holds = holds;
         selectedHoldi = holds.length - 1;
         selectedHold = holds[holds.length - 1];
     }
 
-    async function segmentHolds() {
+    function segmentHolds() {
         if (!wallImgURL) {
             return;
         }
-        // await segmentationWorker.postMessage({type: 'reset'});
-        // segmentationWorkerEmbedded = false;
-        if (!segmentationWorkerEmbedded) {
-            await segmentationWorker.postMessage({type: 'segment', data: wallImgURL});
-            return;
-        }
-        for (let i = 0; i < holds.length; i++) {
-            await segmentationWorker.postMessage({
-                type: 'decode',
-                data: {
-                    bbox: [holds[i].left, holds[i].top, holds[i].right, holds[i].bottom],
-                    hold_i: i
-                }
-            });
-        }
-    }
-
-    let maskData;
-    let scores;
-    let imageInputs;
-    let imageEmbeddings;
-    let model;
-    let processor;
-    let segmented = false;
-    async function oldsegmentHolds() {
-        if (segmented) {
-            return;
-        }
-        segmented = true;
-        if (!model) {
-            model = await SamModel.from_pretrained(
-                "Xenova/slimsam-77-uniform", {
-                    revision: 'boxes',
-            });
-        }
-        if (!processor) {
-            processor = await AutoProcessor.from_pretrained(
-                "Xenova/slimsam-77-uniform", {
-                    revision: 'boxes',
-            });
-        }
-        if (!imageEmbeddings) {
-            let embed_time_start = performance.now();
-            const rawImage = await RawImage.read(wallImgURL);
-            console.log(rawImage);
-            imageInputs = await processor(rawImage);
-            console.log(imageInputs);
-            imageEmbeddings = await model.get_image_embeddings(imageInputs);
-            console.log("embed time: ", performance.now() - embed_time_start, " ms");
-        }
-
-        let segment_time_start = performance.now();
-        for (let i = 0; i < holds.length; i++) {
-            await segmentHold(imageEmbeddings, holds[i]);
-            drawMask(i);
-        }
-        console.log("segment time: ", performance.now() - segment_time_start, " ms");
-    }
-
-    async function segmentHold(imageEmbeddings, hold) {
-        let input_boxes = [[[hold.left, hold.top, hold.right, hold.bottom]]];
-        const outputs = await model({
-            ...imageEmbeddings,
-            input_points: null,
-            input_labels: null,
-            input_boxes: processor.reshape_input_points(
-                input_boxes,
-                imageInputs.original_sizes,
-                imageInputs.reshaped_input_sizes,
-                true
-            )
-        });
-        const masks = (await processor.post_process_masks(outputs.pred_masks, imageInputs.original_sizes, imageInputs.reshaped_input_sizes))[0][0];
-        let bestMask = masks[0];
-        let bestScore = outputs.iou_scores.data[0];
-        for (let i = 1; i < masks.dims[1]; i++) {
-            if (outputs.iou_scores.data[i] > bestScore) {
-                bestMask = masks[i];
-                bestScore = outputs.iou_scores.data[i];
-            }
-        }
-        // create image from bestMask tensor (tensors are transformers.js tensors, _not_ tensorflow tensors)
-        let imgMask = bestMask.mul(255).unsqueeze(0);
-        let image = await RawImage.fromTensor(imgMask);
-        hold.mask = await image.toBlob();
-        // draw image
-        // segmentationCanvas.width = wallImg.width;
-        // segmentationCanvas.height = wallImg.height;
-        // let ctx = segmentationCanvas.getContext("2d");
-        // console.log(image.toCanvas());
-        // ctx.drawImage(image.toCanvas(), 0, 0);
-    }
-
-    // $: if (selectedHoldi != null && holds[selectedHoldi] && holds[selectedHoldi]?.mask) {
-    //     drawMask(selectedHoldi);
-    // }
-
-    $: if (selectedHoldi == null && segmentationCanvas) {
-        const ctx = segmentationCanvas.getContext("2d");
-        ctx.clearRect(0, 0, segmentationCanvas.width, segmentationCanvas.height);
-    }
-
-    function drawMask(segment_i) {
-        if (!segmentationCanvas) {
-            return;
-        }
-        segmentationCanvas.width = wallImg.width;
-        segmentationCanvas.height = wallImg.height;
-        const ctx = segmentationCanvas.getContext("2d");
-        ctx.clearRect(0, 0, segmentationCanvas.width, segmentationCanvas.height);
-        ctx.globalAlpha = 0.2;
-        let img = new Image;
-        img.src = URL.createObjectURL(holds[segment_i].mask);
-        img.onload = () => {
-            ctx.drawImage(img, 0, 0);
-        };
-        // const imageData = ctx.createImageData(segmentationCanvas.width, segmentationCanvas.height);
-        // for (let i = 0; i < imageData.data.length / 4; i += 1) {
-        //     // TODO: this is dumb
-        //     let x = i % segmentationCanvas.width;
-        //     let y = Math.floor(i / segmentationCanvas.width);
-        //     // if (x < holds[selectedHoldi].left || x > holds[selectedHoldi].right || y < holds[selectedHoldi].top || y > holds[selectedHoldi].bottom) {
-        //     //     continue;
-        //     // }
-        //     if (holds[segment_i].mask[y][x] > 0) {
-        //         imageData.data[i * 4 + 0] = 0; // r
-        //         imageData.data[i * 4 + 1] = 121; // g
-        //         imageData.data[i * 4 + 2] = 180; // b
-        //         imageData.data[i * 4 + 3] = 127; // a
-        //     }
-        // }
-        // ctx.putImageData(imageData, 0, 0);
-    }
-
-    async function drawMasks() {
-        console.log(maskData);
-        if (!segmentationCanvas) {
-            return;
-        }
-        segmentationCanvas.width = wallImg.width;
-        segmentationCanvas.height = wallImg.height;
-        const ctx = segmentationCanvas.getContext("2d");
-        ctx.clearRect(0, 0, segmentationCanvas.width, segmentationCanvas.height);
-        const imageData = ctx.createImageData(segmentationCanvas.width, segmentationCanvas.height);
-        // TODO: remove debug
-        let drawStart = performance.now();
-        for (let i = 0; i < maskData.dims[0]; i++) {
-            let bestMask = maskData[i][0];
-            let bestMaski = 0;
-            for (let j = 1; j < maskData.dims[1]; j++) {
-                if (scores[i][j] > scores[i][bestMaski]) {
-                    bestMask = maskData[i][j];
-                    bestMaski = j;
-                }
-            }
-            let mask = bestMask.tolist();
-            for (let i = 0; i < imageData.data.length / 4; i += 1) {
-                let thisVal = mask[Math.floor(i / segmentationCanvas.width)][i % segmentationCanvas.width];
-                if (thisVal > 0) {
-                    imageData.data[i * 4 + 0] = 0; // r
-                    imageData.data[i * 4 + 1] = 121; // g
-                    imageData.data[i * 4 + 2] = 180; // b
-                    imageData.data[i * 4 + 3] = 127; // a
-                }
-            }
-        }
-        ctx.putImageData(imageData, 0, 0);
-        console.log("done, draw took", performance.now() - drawStart, "ms");
+        samHandler.segment(wallImgURL);
+        samHandler.decode();
     }
 </script>
 
@@ -387,6 +299,28 @@
         position: absolute;
         left: 0;
         top: 0;
+        stroke-linejoin: round;
+    }
+
+    .contour {
+        opacity: 0;
+        animation: reveal 1s ease-in-out forwards;
+    }
+
+    /* TODO: find a way to disable this animation when showing all hold contours at once */
+    /*       (it lags like crazy with more than a couple hundred holds) */
+    /* TODO: keep the base contour (aside from glow) even after glow finishes */
+
+    @keyframes reveal {
+        0% {
+            opacity: 0;
+        }
+        20% {
+            opacity: 1;
+        }
+        100% {
+            opacity: 0;
+        }
     }
 
     .draggable {
@@ -434,8 +368,10 @@
 </style>
 
 <main>
+<p>{numWorkersText}</p>
 <div id="holdsUIContainer" bind:this={holdsOverlayContainer} on:touchmove={(e) => e.preventDefault()}>
     <div id="controls">
+        <!-- TODO: don't propagate pointer events through to the panzoom -->
         <button on:click={addHold} on:mouseover={previewAddHold} on:focus={previewAddHold}>
             <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
                 <path d="M680-80v-120H560v-80h120v-120h80v120h120v80H760v120h-80ZM200-200v-200h80v120h120v80H200Zm0-360v-200h200v80H280v120h-80Zm480 0v-120H560v-80h200v200h-80Z"/>
@@ -450,6 +386,7 @@
         <button on:click={segmentHolds}>segment</button>
     </div>
     {#if wallImgURL}
+        <!-- TODO: prevent hold outline flicker when selecting holds -->
         <!-- svelte-ignore a11y-no-static-element-interactions -->
         <div
             id="holdsUI"
@@ -462,22 +399,53 @@
             on:touchcancel={handleResizeEnd}
         > -->
             <img bind:this={wallImg} src={wallImgURL} alt="the climbing wall you uploaded"/>
-            <canvas bind:this={segmentationCanvas}></canvas>
             <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="100%" height="100%" overflow="visible">
-                {#each holds as hold}
+                <defs>
+                    <!-- adapted from glow filter by Pedro Tavares -->
+                    <filter id="sofGlow" height="300%" width="300%" x="-75%" y="-75%">
+                        <feMorphology id="contourBlur" operator="dilate" radius="4" in="SourceAlpha" result="thicken" />
+                        <feGaussianBlur in="thicken" stdDeviation="10" result="blurred" />
+                        <feFlood flood-color="rgb(0,186,255)" result="glowColor" />
+                        <feComposite in="glowColor" in2="blurred" operator="in" result="softGlow_colored" />
+                        <feMerge>
+                            <feMergeNode in="softGlow_colored"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                    <filter id="glow" x="-75%" y="-75%" width="300%" height="300%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#1d85bb"></feDropShadow>
+                        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#1d85bb"></feDropShadow>
+                        <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#1d85bb"></feDropShadow>
+                        <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#1d85bb"></feDropShadow>
+                    </filter>
+                </defs>
+                <!-- <path id="mask-path" class="mask-path" d="" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".8" fill-opacity="0" stroke="#1d85bb" stroke-width="3" filter="url(#glow)"></path> -->
+                <!-- <animate xlink:href="#contourBlur" attributeName="radius" from="4" to="1" dur="1s" begin="0s" repeatCount="indefinite"></animate> -->
+                {#each holds as hold, i}
+                    {#if hold.mask && (selectedHoldi == null || selectedHoldi == i)}
+                        {#each hold.mask as maskPoly}
+                            <polygon class="contour"
+                                points="{maskPoly.map((x, i) => i % 2 === 0 ? `${x},${maskPoly[i + 1]} ` : "").join(' ')}"
+                                fill="rgba(0,0,0,0.0)"
+                                stroke="blue"
+                                stroke-width="2"
+                                filter="url(#glow)"
+                            ></polygon>
+                        {/each}
+                    {/if}
                     <!-- svelte-ignore a11y-no-static-element-interactions -->
                     <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
                     <!-- TODO: improve hold (tab) ordering for accessibility -->
                     <rect
                         width="{hold.right - hold.left}"
                         height="{hold.bottom - hold.top}"
-                        tabindex="0"
+                        tabindex="-1"
                         stroke="red"
                         fill="{selectedHold && selectedHold.id == hold.id ? 'rgba(1,0,0,0.0)' : 'rgba(0,0,0,0.0)'}"
                         stroke-width="1"
                         x="{hold.left}"
                         y="{hold.top}"
-                        on:click={handleHoldClick}
+                        on:click|stopPropagation={handleHoldClick}
                         on:keypress={() => handleHoldKeypress(hold)}
                     ></rect>
                 {/each}
@@ -490,7 +458,7 @@
                             stroke="red"
                             stroke-width="{RESIZE_HANDLE_RADIUS / 5}"
                             r="{RESIZE_HANDLE_RADIUS}"
-                            tabindex="0"
+                            tabindex="-1"
                             cx="{holds[selectedHoldi].left * DIRS[dir][0] + holds[selectedHoldi].right * DIRS[dir][2]}"
                             cy="{holds[selectedHoldi].top * DIRS[dir][1] + holds[selectedHoldi].bottom * DIRS[dir][3]}"
                             class="{dir == "top" || dir == "bottom" ? 'draggable draggable-ns' : 'draggable draggable-ew'}"
