@@ -2,7 +2,6 @@
     import createPanZoom from "panzoom";
     import { env, SamModel, AutoProcessor, RawImage, Tensor } from "@xenova/transformers";
     import { cat, stack } from "@xenova/transformers";
-    import cv from "@techstark/opencv-js";
 
     import type { Hold } from "$lib/Hold";
 	import Page from "../routes/+page.svelte";
@@ -10,6 +9,8 @@
 
     export let wallImgURL;
     export let holds:Hold[];
+
+    $: allHoldsContoured = holds.every((hold) => hold.mask);
 
     env.allowLocalModels = false;
 
@@ -169,6 +170,7 @@
         }
         if (!candidates) {
             selectedHold = null;
+            selectedHoldi = null;
         }
         // we could store distances but this is super fast enough
         candidates.sort((a, b) => {
@@ -180,9 +182,7 @@
         });
         console.log(candidates);
         selectedHold = candidates[0];
-        selectedHoldi = holds.findIndex((h) => h.id == selectedHold.id); // TODO: awk
-        console.log(selectedHoldi);
-        console.log(selectedHold.id);
+        selectedHoldi = holds.findIndex((h) => h?.id != null && h.id == selectedHold.id); // TODO: awk
     }
 
     function handleHoldKeypress(hold) {
@@ -217,10 +217,11 @@
     }
 
     async function handleResizeEnd(e) {
-        resizingDir = null;
-        if (selectedHoldi) {
+        // TODO: check if size has actually changed
+        if (resizingDir && selectedHoldi != null) {
             samHandler.decodeOne(selectedHoldi);
         }
+        resizingDir = null;
     }
 
     function deleteSelectedHold() {
@@ -256,6 +257,7 @@
         holds = holds;
         selectedHoldi = holds.length - 1;
         selectedHold = holds[holds.length - 1];
+        // TODO: segment immediately
     }
 
     function segmentHolds() {
@@ -303,7 +305,11 @@
     }
 
     .contour {
-        opacity: 0;
+        pointer-events: none;
+    }
+
+    .glow {
+        opacity: 1;
         animation: reveal 1s ease-in-out forwards;
     }
 
@@ -313,9 +319,6 @@
 
     @keyframes reveal {
         0% {
-            opacity: 0;
-        }
-        20% {
             opacity: 1;
         }
         100% {
@@ -368,6 +371,7 @@
 </style>
 
 <main>
+<p>{holds.filter((h) => h.mask).length} / {holds.length} holds segmented</p>
 <p>{numWorkersText}</p>
 <div id="holdsUIContainer" bind:this={holdsOverlayContainer} on:touchmove={(e) => e.preventDefault()}>
     <div id="controls">
@@ -388,30 +392,16 @@
     {#if wallImgURL}
         <!-- TODO: prevent hold outline flicker when selecting holds -->
         <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
         <div
             id="holdsUI"
             bind:this={holdsOverlay}
-            on:pointerdown={(e) => {selectedHold = null; selectedHoldi = null;}}
             on:pointermove={(e) => {if (resizingDir) {handleResizeMouseMove(e);};}}
-            on:pointerup={handleResizeEnd}>
-            <!-- on:touchend={handleResizeEnd}
-            on:mouseup={handleResizeEnd}
-            on:touchcancel={handleResizeEnd}
-        > -->
+            on:pointerup={handleResizeEnd}
+        >
             <img bind:this={wallImg} src={wallImgURL} alt="the climbing wall you uploaded"/>
             <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="100%" height="100%" overflow="visible">
                 <defs>
-                    <!-- adapted from glow filter by Pedro Tavares -->
-                    <filter id="sofGlow" height="300%" width="300%" x="-75%" y="-75%">
-                        <feMorphology id="contourBlur" operator="dilate" radius="4" in="SourceAlpha" result="thicken" />
-                        <feGaussianBlur in="thicken" stdDeviation="10" result="blurred" />
-                        <feFlood flood-color="rgb(0,186,255)" result="glowColor" />
-                        <feComposite in="glowColor" in2="blurred" operator="in" result="softGlow_colored" />
-                        <feMerge>
-                            <feMergeNode in="softGlow_colored"/>
-                            <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                    </filter>
                     <filter id="glow" x="-75%" y="-75%" width="300%" height="300%">
                         <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#1d85bb"></feDropShadow>
                         <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#1d85bb"></feDropShadow>
@@ -422,31 +412,40 @@
                 <!-- <path id="mask-path" class="mask-path" d="" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".8" fill-opacity="0" stroke="#1d85bb" stroke-width="3" filter="url(#glow)"></path> -->
                 <!-- <animate xlink:href="#contourBlur" attributeName="radius" from="4" to="1" dur="1s" begin="0s" repeatCount="indefinite"></animate> -->
                 {#each holds as hold, i}
-                    {#if hold.mask && (selectedHoldi == null || selectedHoldi == i)}
+                    {#if hold.mask}
                         {#each hold.mask as maskPoly}
-                            <polygon class="contour"
+                            <polygon class={!allHoldsContoured || selectedHoldi == i ? "contour glow" : "contour"}
                                 points="{maskPoly.map((x, i) => i % 2 === 0 ? `${x},${maskPoly[i + 1]} ` : "").join(' ')}"
-                                fill="rgba(0,0,0,0.0)"
+                                fill="transparent"
                                 stroke="blue"
                                 stroke-width="2"
-                                filter="url(#glow)"
+                                filter={!allHoldsContoured || selectedHoldi == i ? "url(#glow)" : ""}
                             ></polygon>
                         {/each}
+                        {#if selectedHoldi == i}
+                            {#each hold.mask as maskPoly}
+                                <polygon class="contour"
+                                    points="{maskPoly.map((x, i) => i % 2 === 0 ? `${x},${maskPoly[i + 1]} ` : "").join(' ')}"
+                                    fill="transparent"
+                                    stroke="blue"
+                                    stroke-width="2"
+                                ></polygon>
+                            {/each}
+                        {/if}
                     {/if}
                     <!-- svelte-ignore a11y-no-static-element-interactions -->
-                    <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
-                    <!-- TODO: improve hold (tab) ordering for accessibility -->
                     <rect
                         width="{hold.right - hold.left}"
                         height="{hold.bottom - hold.top}"
-                        tabindex="-1"
+                        fill="transparent"
                         stroke="red"
-                        fill="{selectedHold && selectedHold.id == hold.id ? 'rgba(1,0,0,0.0)' : 'rgba(0,0,0,0.0)'}"
                         stroke-width="1"
                         x="{hold.left}"
                         y="{hold.top}"
                         on:click|stopPropagation={handleHoldClick}
                         on:keypress={() => handleHoldKeypress(hold)}
+                        on:pointerup={handleResizeEnd}
+                        on:touchend={handleResizeEnd}
                     ></rect>
                 {/each}
                 {#if selectedHoldi != null && holds[selectedHoldi]}

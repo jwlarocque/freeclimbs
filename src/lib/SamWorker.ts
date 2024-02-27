@@ -117,62 +117,57 @@ self.onmessage = async (e) => {
     }
 }
 
-function post_process_masks(mask, original_size, reshaped_input_size, pad_size, {
-    mask_threshold = 0.0,
-    binarize = true,
-} = {}) {
+function post_process_masks(mask, original_size, reshaped_input_size, pad_size) {
     // mask: [256, 256]
+    let opencv_mask = cv.matFromArray(256, 256, cv.CV_32FC1, mask.data);
+    // upscale mask to padded size
+    let padded_size = new cv.Size(pad_size.height, pad_size.width);
+    cv.resize(opencv_mask, opencv_mask, padded_size, cv.INTER_LINEAR);
+    // crop mask
+    let roi = new cv.Rect(0, 0, reshaped_input_size[1], reshaped_input_size[0]);
+    opencv_mask = opencv_mask.roi(roi);
+    // downscale mask
+    let downscaled_size = new cv.Size(original_size[1], original_size[0]);
+    cv.resize(opencv_mask, opencv_mask, downscaled_size, cv.INTER_LINEAR);
 
-    const target_image_size = [pad_size.height, pad_size.width];
-
-    // Upscale mask to padded size
-    let interpolated_mask = interpolate(mask, target_image_size, 'bilinear', false);
-
-    // Crop mask
-    interpolated_mask = interpolated_mask.slice(null, [0, reshaped_input_size[0]], [0, reshaped_input_size[1]]);
-    // Downscale mask
-    interpolated_mask = interpolate(interpolated_mask, [original_size[0], original_size[1]], 'bilinear', false);
-
-    // Binarize mask
-    const data = new Uint8Array(interpolated_mask.data.length);
-    for (let i = 0; i < interpolated_mask.data.length; ++i) {
-        if (interpolated_mask.data[i] > 0) {
-            data[i] = 1;
-        }
-    }
-    
-    let mat = cv.matFromArray(original_size[0], original_size[1], cv.CV_8UC1, data);
+    // To 8 bit for contour detection
+    opencv_mask.convertTo(opencv_mask, cv.CV_8UC1);
+    // erode away stray pixels
     let M = cv.Mat.ones(5, 5, cv.CV_8UC1);
     let anchor = new cv.Point(-1, -1)
-    cv.erode(mat, mat, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
-    cv.dilate(mat, mat, M, anchor, 2, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+    cv.erode(opencv_mask, opencv_mask, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+    cv.dilate(opencv_mask, opencv_mask, M, anchor, 2, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+    // find contours (external only)
     let contours = new cv.MatVector();
     let hierarchy = new cv.Mat();
-    cv.findContours(mat, contours, hierarchy, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE);
+    cv.findContours(opencv_mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
     let poly = new cv.MatVector();
     let contourArray = [];
     for (let i = 0; i < contours.size(); i++) {
         let tmp = new cv.Mat();
         let contour = contours.get(i);
-        let epsilon = 0.002 * cv.arcLength(contour, true);
+        let epsilon = 0.005 * cv.arcLength(contour, true);
         cv.approxPolyDP(contour, tmp, epsilon, true);
+        // might be a better way to get polygons?
         poly.push_back(tmp);
         // TODO: try skipping `poly` again and getting data directly from the contour
         //       careful of memory leaks (don't send the ArrayBuffer to the main thread)
         // contourArray.push(tmp.data32S);
+        // be sure to free the memory
         contour.delete();
         tmp.delete();
     }
+    // convert to regular JS nested array
     for (let i = 0; i < poly.size(); i++) {
         contourArray.push(Array.from(poly.get(i).data32S));
     }
-    mat.delete();
+    // free memory again
+    opencv_mask.delete();
     M.delete();
     poly.delete();
     contours.delete();
     hierarchy.delete();
 
-    console.log(contourArray);
     return contourArray;
 }
 
