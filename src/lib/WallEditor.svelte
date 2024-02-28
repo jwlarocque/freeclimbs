@@ -1,18 +1,15 @@
 <script lang="ts">
+    // TODO: clean up this god component
+
+	import { fly } from "svelte/transition";
     import createPanZoom from "panzoom";
-    import { env, SamModel, AutoProcessor, RawImage, Tensor } from "@xenova/transformers";
-    import { cat, stack } from "@xenova/transformers";
 
     import type { Hold } from "$lib/Hold";
-	import Page from "../routes/+page.svelte";
     import SamWorker from "$lib/SamWorker?worker";
 
     export let wallImgURL;
     export let holds:Hold[];
 
-    $: allHoldsContoured = holds.every((hold) => hold.mask);
-
-    env.allowLocalModels = false;
 
     const DIRS = {
         "left": [1, 0.5, 0, 0.5],
@@ -20,7 +17,7 @@
         "right": [0, 0.5, 1, 0.5],
         "bottom": [0.5, 0, 0.5, 1]
     };
-    const RESIZE_HANDLE_RADIUS = 7;
+    const RESIZE_HANDLE_RADIUS = ('ontouchstart' in document.documentElement) ? 10 : 5;
 
     let numWorkersText = "";
 
@@ -28,6 +25,8 @@
     // TODO: discard old decodes by id when they're no longer needed
     //       (this may be complicated)
     // TODO: why do I have this weird singleton thing?
+    let samHandlerWorkersReady = []; // TODO: incredibly, insanely dumb
+    let samHandlerWorkersEmbedded = []; // seriously just get rid of this
     class SamHandler {
         workers: Worker[] = [];
         workersReady: boolean[] = [];
@@ -49,11 +48,14 @@
                     const {type, data} = e.data;
                     if (type === 'ready') {
                         this.workersReady[i] = true;
+                        samHandlerWorkersReady[i] = true;
                     } else if (type === 'segment_result') {
                         if (data == "start") {
                             this.workersEmbedded[i] = "running";
+                            samHandlerWorkersEmbedded[i] = "running";
                         } else if (data == "done") {
                             this.workersEmbedded[i] = "done";
+                            samHandlerWorkersEmbedded[i] = "done";
                             this.decodeFromQueue(i);
                         }
                     } else if (type === 'decode_result') {
@@ -69,7 +71,9 @@
                 }
                 this.workers.push(worker);
                 this.workersReady.push(false);
+                samHandlerWorkersReady.push(false);
                 this.workersEmbedded.push("not_started");
+                samHandlerWorkersEmbedded.push("not_started");
             }
         }
 
@@ -124,6 +128,15 @@
             this.decodeQueue.push(hold_i);
             this.decodeFromQueue(0);
         }
+
+        cullWorkers() {
+            for (let i = 1; i < this.workers.length; i++) {
+                this.workers[i].terminate();
+            }
+            this.workers = [this.workers[0]];
+            this.workersReady = [this.workersReady[0]];
+            this.workersEmbedded = [this.workersEmbedded[0]];
+        }
     }
 
     let samHandler = new SamHandler();
@@ -136,9 +149,22 @@
     let clickDisabled = false;
     let selectedHold = null;
     let selectedHoldi;
+
+    let allHoldsContoured = false;
+    $: if (holds.every((hold) => hold.mask)) {
+        allHoldsContoured = true;
+        samHandler.cullWorkers();
+        panzoom.resume();
+    }
    
     $: if (wallImgLoaded && panzoom) {
-        panzoom.zoomTo(0, 0, holdsOverlay.clientWidth / wallImg.width);
+        let zoom = Math.min(
+            holdsOverlayContainer.clientWidth / wallImg.width,
+            holdsOverlayContainer.clientHeight / wallImg.height);
+        panzoom.zoomTo(0, 0, zoom);
+        panzoom.moveBy((holdsOverlayContainer.clientWidth - zoom * wallImg.width) / 2, 0);
+        panzoom.pause();
+        segmentHolds();
     }
     $: if (wallImg) {
         wallImg.onload = () => {
@@ -150,6 +176,7 @@
         panzoom = createPanZoom(holdsOverlay, {
             maxZoom: 10,
             minZoom: 0.1,
+            zoomDoubleClickSpeed: 1,
             onTouch: (e) => {return false;}
         });
     }
@@ -180,7 +207,6 @@
             let bdy = ((b.top + b.bottom) / 2 - event.offsetY) ** 2;
             return (adx + ady) - (bdx + bdy);
         });
-        console.log(candidates);
         selectedHold = candidates[0];
         selectedHoldi = holds.findIndex((h) => h?.id != null && h.id == selectedHold.id); // TODO: awk
     }
@@ -255,9 +281,9 @@
             bottom: -1/zoom * (panY - containerRect.height * 0.8)
         });
         holds = holds;
-        selectedHoldi = holds.length - 1;
         selectedHold = holds[holds.length - 1];
-        // TODO: segment immediately
+        selectedHoldi = holds.length - 1;
+        samHandler.decodeOne(selectedHoldi);
     }
 
     function segmentHolds() {
@@ -272,18 +298,19 @@
 
 <style>
     main {
-        max-width: calc(max(94%, 100% - 4em));
+        width: 100%;
         margin: auto;
+        position: relative;
+        overflow: hidden;
     }
 
     #holdsUIContainer {
         position: relative;
         overflow: hidden;
-        height: 90vh;
+        height: 60vh;
         box-shadow: inset 0 0 3px;
-        border-radius: 10px;
-        background-color: #fdfdfd;
-        background-image: radial-gradient(#cccccc 1.5px, #918c8a 1.5px);
+        border-radius: 0 0 10px 10px;
+        background-image: radial-gradient(var(--color-greeblies) 1.5px, rgba(0, 0, 0, 0.1) 1.5px);
         background-size: 26px 26px;
     }
 
@@ -297,7 +324,7 @@
         box-shadow: 0 0 5px black;
     }
 
-    #holdsUI > svg, #holdsUI > canvas {
+    #holdsUI > svg {
         position: absolute;
         left: 0;
         top: 0;
@@ -326,10 +353,6 @@
         }
     }
 
-    .draggable {
-        
-    }
-
     .draggable-ew {
         cursor: ew-resize
     }
@@ -341,18 +364,19 @@
     #controls {
         position: relative;
         z-index: 10;
-        max-width: 90%;
+        width: 100%;
         min-width: 10%;
-        width: fit-content;
         margin: auto;
         box-shadow: 0 0 3px black;
         background-color: lightgrey;
         padding: 0.6em;
-        border-radius: 0 0 10px 10px;
+        border-radius: 10px 10px 0 0;
         display: flex;
         flex-direction: row;
         gap: 0.6em;
-        align-content: space-around;
+        justify-content: center;
+        align-items: center;
+        box-sizing: border-box;
     }
 
     #controls button {
@@ -368,12 +392,31 @@
     button.deemph {
         color: #918c8a;
     }
+
+    #processStatus {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background-color: var(--color-major);
+        color: var(--color-background);
+        padding: 0.5em;
+        margin: 0.5em;
+        border-radius: 10px;
+    }
+
+    #processStatus p {
+        margin: 0.2em;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 1.5em;
+    }
 </style>
 
 <main>
-<p>{holds.filter((h) => h.mask).length} / {holds.length} holds segmented</p>
-<p>{numWorkersText}</p>
-<div id="holdsUIContainer" bind:this={holdsOverlayContainer} on:touchmove={(e) => e.preventDefault()}>
+    <button on:click={(e) => {console.log(panzoom.getTransform())}}>panzoom status</button>
+    <p>{holds.filter((h) => h.mask).length} / {holds.length} holds segmented</p>
+    <p>{numWorkersText}</p>
     <div id="controls">
         <!-- TODO: don't propagate pointer events through to the panzoom -->
         <button on:click={addHold} on:mouseover={previewAddHold} on:focus={previewAddHold}>
@@ -381,93 +424,107 @@
                 <path d="M680-80v-120H560v-80h120v-120h80v120h120v80H760v120h-80ZM200-200v-200h80v120h120v80H200Zm0-360v-200h200v80H280v120h-80Zm480 0v-120H560v-80h200v200h-80Z"/>
             </svg>
         </button>
-        <!-- TODO: disable this button when no hold is selected -->
         <button on:click={deleteSelectedHold} class={selectedHoldi != null ? "delete" : "deemph"}>
             <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
                 <path fill="currentcolor" d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/>
             </svg>
         </button>
-        <button on:click={segmentHolds}>segment</button>
     </div>
-    {#if wallImgURL}
-        <!-- TODO: prevent hold outline flicker when selecting holds -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div
-            id="holdsUI"
-            bind:this={holdsOverlay}
-            on:pointermove={(e) => {if (resizingDir) {handleResizeMouseMove(e);};}}
-            on:pointerup={handleResizeEnd}
-        >
-            <img bind:this={wallImg} src={wallImgURL} alt="the climbing wall you uploaded"/>
-            <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="100%" height="100%" overflow="visible">
-                <defs>
-                    <filter id="glow" x="-75%" y="-75%" width="300%" height="300%">
-                        <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#1d85bb"></feDropShadow>
-                        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#1d85bb"></feDropShadow>
-                        <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#1d85bb"></feDropShadow>
-                        <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#1d85bb"></feDropShadow>
-                    </filter>
-                </defs>
-                <!-- <path id="mask-path" class="mask-path" d="" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".8" fill-opacity="0" stroke="#1d85bb" stroke-width="3" filter="url(#glow)"></path> -->
-                <!-- <animate xlink:href="#contourBlur" attributeName="radius" from="4" to="1" dur="1s" begin="0s" repeatCount="indefinite"></animate> -->
-                {#each holds as hold, i}
-                    {#if hold.mask}
-                        {#each hold.mask as maskPoly}
-                            <polygon class={!allHoldsContoured || selectedHoldi == i ? "contour glow" : "contour"}
-                                points="{maskPoly.map((x, i) => i % 2 === 0 ? `${x},${maskPoly[i + 1]} ` : "").join(' ')}"
-                                fill="transparent"
-                                stroke="blue"
-                                stroke-width="2"
-                                filter={!allHoldsContoured || selectedHoldi == i ? "url(#glow)" : ""}
-                            ></polygon>
-                        {/each}
-                        {#if selectedHoldi == i}
+    <div id="holdsUIContainer" bind:this={holdsOverlayContainer} on:touchmove={(e) => e.preventDefault()}>
+        {#if wallImgURL}
+            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <div
+                id="holdsUI"
+                bind:this={holdsOverlay}
+                on:pointermove={(e) => {if (resizingDir) {handleResizeMouseMove(e);};}}
+                on:pointerup={handleResizeEnd}
+            >
+                <img bind:this={wallImg} src={wallImgURL} alt="the climbing wall you uploaded"/>
+                <svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="100%" height="100%" overflow="visible">
+                    <defs>
+                        <filter id="glow" x="-75%" y="-75%" width="300%" height="300%">
+                            <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#1d85bb"></feDropShadow>
+                            <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#1d85bb"></feDropShadow>
+                            <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#1d85bb"></feDropShadow>
+                            <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#1d85bb"></feDropShadow>
+                        </filter>
+                    </defs>
+                    <!-- <path id="mask-path" class="mask-path" d="" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".8" fill-opacity="0" stroke="#1d85bb" stroke-width="3" filter="url(#glow)"></path> -->
+                    <!-- <animate xlink:href="#contourBlur" attributeName="radius" from="4" to="1" dur="1s" begin="0s" repeatCount="indefinite"></animate> -->
+                    {#each holds as hold, i}
+                        {#if hold.mask}
                             {#each hold.mask as maskPoly}
-                                <polygon class="contour"
+                                <polygon class={!allHoldsContoured || selectedHoldi == i ? "contour glow" : "contour"}
                                     points="{maskPoly.map((x, i) => i % 2 === 0 ? `${x},${maskPoly[i + 1]} ` : "").join(' ')}"
                                     fill="transparent"
                                     stroke="blue"
                                     stroke-width="2"
+                                    filter={!allHoldsContoured || selectedHoldi == i ? "url(#glow)" : ""}
                                 ></polygon>
                             {/each}
+                            {#if selectedHoldi == i}
+                                {#each hold.mask as maskPoly}
+                                    <polygon class="contour"
+                                        points="{maskPoly.map((x, i) => i % 2 === 0 ? `${x},${maskPoly[i + 1]} ` : "").join(' ')}"
+                                        fill="transparent"
+                                        stroke="blue"
+                                        stroke-width="2"
+                                    ></polygon>
+                                {/each}
+                            {/if}
                         {/if}
-                    {/if}
-                    <!-- svelte-ignore a11y-no-static-element-interactions -->
-                    <rect
-                        width="{hold.right - hold.left}"
-                        height="{hold.bottom - hold.top}"
-                        fill="transparent"
-                        stroke="red"
-                        stroke-width="1"
-                        x="{hold.left}"
-                        y="{hold.top}"
-                        on:click|stopPropagation={handleHoldClick}
-                        on:keypress={() => handleHoldKeypress(hold)}
-                        on:pointerup={handleResizeEnd}
-                        on:touchend={handleResizeEnd}
-                    ></rect>
-                {/each}
-                {#if selectedHoldi != null && holds[selectedHoldi]}
-                    {#each Object.keys(DIRS) as dir}
                         <!-- svelte-ignore a11y-no-static-element-interactions -->
-                        <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
-                        <circle
-                            fill="white"
+                        <rect
+                            width="{hold.right - hold.left}"
+                            height="{hold.bottom - hold.top}"
+                            fill="transparent"
                             stroke="red"
-                            stroke-width="{RESIZE_HANDLE_RADIUS / 5}"
-                            r="{RESIZE_HANDLE_RADIUS}"
-                            tabindex="-1"
-                            cx="{holds[selectedHoldi].left * DIRS[dir][0] + holds[selectedHoldi].right * DIRS[dir][2]}"
-                            cy="{holds[selectedHoldi].top * DIRS[dir][1] + holds[selectedHoldi].bottom * DIRS[dir][3]}"
-                            class="{dir == "top" || dir == "bottom" ? 'draggable draggable-ns' : 'draggable draggable-ew'}"
-                            on:pointerdown={(e) => {startHoldResize(e, dir);}}
-                            on:touchstart={(e) => {startHoldResize(e, dir);}}
-                        ></circle>
+                            stroke-width="1"
+                            x="{hold.left}"
+                            y="{hold.top}"
+                            on:click|stopPropagation={handleHoldClick}
+                            on:keypress={() => handleHoldKeypress(hold)}
+                            on:pointerup={handleResizeEnd}
+                            on:touchend={handleResizeEnd}
+                        ></rect>
                     {/each}
-                {/if}
-            </svg>
+                    {#if selectedHoldi != null && holds[selectedHoldi]}
+                        {#each Object.keys(DIRS) as dir}
+                            <!-- svelte-ignore a11y-no-static-element-interactions -->
+                            <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
+                            <circle
+                                fill="white"
+                                stroke="red"
+                                stroke-width="{RESIZE_HANDLE_RADIUS / 5}"
+                                r="{RESIZE_HANDLE_RADIUS}"
+                                tabindex="-1"
+                                cx="{holds[selectedHoldi].left * DIRS[dir][0] + holds[selectedHoldi].right * DIRS[dir][2]}"
+                                cy="{holds[selectedHoldi].top * DIRS[dir][1] + holds[selectedHoldi].bottom * DIRS[dir][3]}"
+                                class="{dir == "top" || dir == "bottom" ? 'draggable draggable-ns' : 'draggable draggable-ew'}"
+                                on:pointerdown={(e) => {startHoldResize(e, dir);}}
+                                on:touchstart={(e) => {startHoldResize(e, dir);}}
+                            ></circle>
+                        {/each}
+                    {/if}
+                </svg>
+            </div>
+        {/if}
+    </div>
+    {#if samHandler && samHandler?.workers?.length > 0 && !holds.every((hold) => hold.mask)}
+        <div id="processStatus" transition:fly={{x: 50}}>
+            <p>
+                <span>Creating workers </span>
+                <span>{samHandlerWorkersReady.filter(x => x).length} / {samHandler.workers.length}</span>
+            </p>
+            <p>
+                <span>Encoding image </span>
+                <span>{samHandlerWorkersEmbedded.filter(x => x == "done").length} / {samHandler.workers.length}</span>
+            </p>
+            <p>
+                <span>Segmenting holds </span>
+                <span>{holds.filter((h) => h.mask).length} / {holds.length}</span>
+            </p>
         </div>
     {/if}
-</div>
 </main>

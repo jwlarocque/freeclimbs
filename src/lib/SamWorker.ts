@@ -146,7 +146,7 @@ function post_process_masks(mask, original_size, reshaped_input_size, pad_size) 
     for (let i = 0; i < contours.size(); i++) {
         let tmp = new cv.Mat();
         let contour = contours.get(i);
-        let epsilon = 0.005 * cv.arcLength(contour, true);
+        let epsilon = 0.002 * cv.arcLength(contour, true);
         cv.approxPolyDP(contour, tmp, epsilon, true);
         // might be a better way to get polygons?
         poly.push_back(tmp);
