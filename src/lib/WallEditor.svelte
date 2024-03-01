@@ -1,14 +1,22 @@
 <script lang="ts">
     // TODO: clean up this god component
 
-	import { fly } from "svelte/transition";
+	import { fade, fly } from "svelte/transition";
     import createPanZoom from "panzoom";
 
     import type { Hold } from "$lib/Hold";
     import SamWorker from "$lib/SamWorker?worker";
+	import { onMount } from "svelte";
+	import LoadingEllipsis from "./LoadingEllipsis.svelte";
 
-    export let wallImgURL;
-    export let holds:Hold[];
+
+    export let autoState = "init";
+    $: if (autoState == "init" && wallImgURL) {
+        autoState = "processing";
+    }
+    $: if (autoState == "processing" && numHoldsSegmented >= holds.length) {
+        autoState = "done";
+    }
 
 
     const DIRS = {
@@ -17,23 +25,105 @@
         "right": [0, 0.5, 1, 0.5],
         "bottom": [0.5, 0, 0.5, 1]
     };
-    const RESIZE_HANDLE_RADIUS = ('ontouchstart' in document.documentElement) ? 10 : 5;
+    // TODO: consider tying this to zoom level/making constant relative to window
+    let RESIZE_HANDLE_RADIUS = 5;
 
-    let numWorkersText = "";
+    let holdsOverlayContainer;
+    let holdsOverlay;
+    let wallImg;
+    let wallImgLoaded = false;
+    let selectedHold = null;
+    let selectedHoldi = null;
 
-    // TODO: this decodeId system is insane
-    // TODO: discard old decodes by id when they're no longer needed
-    //       (this may be complicated)
+    onMount(() => {
+        samHandler = new SamHandler();
+        RESIZE_HANDLE_RADIUS = ('ontouchstart' in document.documentElement) ? 10 : 5;
+    });
+
+
+    // == DETECTION ============================================================
+
+    let wallImgFiles:FileList;
+    let wallImgURL;
+    let holds:Hold[];
+    
+    // drag and drop
+    let draggedOver = false;
+    function handleWallImgDrop(e) {
+        let files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleWallImgSubmit(files);
+        }
+    }
+
+    $: if (wallImgFiles) {
+        handleWallImgSubmit(wallImgFiles);
+    }
+
+    function loadExample() {
+        // fetch example_holds.json
+        fetch("example_holds.json").then((response) => response.json()).then((data) => {
+            holds = data["holds"];
+            console.log(holds);
+            wallImgURL = new URL("example_wall.jpg", document.location.origin).toString();
+        });
+    }
+
+    async function handleWallImgSubmit(files) {
+        console.log(files[0]);
+        holds = [];
+        if (wallImgURL) { URL.revokeObjectURL(wallImgURL); }
+        wallImgURL = null;
+        try {
+            let formData = new FormData();
+            formData.append("file", files[0])
+            const response = await fetch("/detect", {
+                method: "POST",
+                body: formData
+            });
+            const result = await response.json();
+            // TODO: handle error
+            for (let i = 0; i < result["confidences"].length; i++) {
+                if (result["confidences"][i] < 0.5) { continue; }
+                holds.push({
+                    id: i,
+                    left: result["boxes"][i][0],
+                    top: result["boxes"][i][1],
+                    right: result["boxes"][i][2],
+                    bottom: result["boxes"][i][3],
+                    confidence: result["confidences"][i]
+                });
+            }
+            holds.sort((a, b) => a.top - b.top);
+            console.log(holds);
+            wallImgURL = URL.createObjectURL(files[0]);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    // == HOLD SEGMENTATION ====================================================
+
+    let allHoldsContoured = false;
+
+    // NOTE: I got rid of the decode ID system to reduce complexity.
+    //       It's not needed because:
+    //           1. The user is locked out of making changes (and invalidating
+    //              old decode responses) during initial segmentation.
+    //           2. Once that's done (all holds have contours), all workers
+    //              except the first are terminated, so in-order decoding from
+    //              the queue is guaranteed.
     // TODO: why do I have this weird singleton thing?
     let samHandlerWorkersReady = []; // TODO: incredibly, insanely dumb
     let samHandlerWorkersEmbedded = []; // seriously just get rid of this
+    $: numWorkersReady = samHandlerWorkersReady.filter(x => x).length;
+    $: numWorkersEmbedded = samHandlerWorkersEmbedded.filter(x => x == "done").length;
+    $: numHoldsSegmented = holds?.filter((h) => h?.contours).length || 0;
     class SamHandler {
         workers: Worker[] = [];
         workersReady: boolean[] = [];
         workersEmbedded: string[] = [];
-        decodeId = 0;
         decodeQueue: any[] = [];
-        decodesInFlight: number[] = [];
 
         constructor() {
             // use at least 1 worker
@@ -41,7 +131,6 @@
             // don't use more than 4 workers
             const memoryWorkerLimit = Math.max(1, Math.floor(Math.min(navigator?.deviceMemory || 2, 8) / 2));
             let numWorkers = Math.min(Math.max(navigator.hardwareConcurrency - 1, 1), memoryWorkerLimit);
-            numWorkersText = `${numWorkers} workers`;
             for (let i = 0; i < numWorkers; i++) {
                 let worker = new SamWorker();
                 worker.onmessage = async (e) => {
@@ -59,12 +148,19 @@
                             this.decodeFromQueue(i);
                         }
                     } else if (type === 'decode_result') {
-                        const {decode_id, hold_i, mask, score} = data;
-                        let decodeIndex = this.decodesInFlight.indexOf(decode_id);
-                        if (decodeIndex != -1) {
-                            this.decodesInFlight.splice(decodeIndex, 1);
-                            holds[hold_i].mask = mask;
-                            // drawMask(hold_i);
+                        let {hold_id, hold_i, contours, score} = data;
+                        if (holds[hold_i].id != hold_id) {
+                            hold_i = holds.findIndex((h) => h.id == data.hold_id);
+                        }
+                        if (hold_i >= 0) {
+                            holds[hold_i].contours = contours;
+                            // reactivity workaround, not sure why this is necessary
+                            selectedHoldi = selectedHoldi;
+                            if (holds.every((hold) => hold.contours)) {
+                                allHoldsContoured = true;
+                                this.cullWorkers();
+                                // TODO: allow pointer events on the UI (also disallow when started)
+                            }
                         }
                         this.decodeFromQueue(i);
                     }
@@ -82,12 +178,10 @@
                 && this.decodeQueue.length > 0
             ) {
                 let hold_i = this.decodeQueue.shift();
-                let thisDecodeId = this.decodeId++;
-                this.decodesInFlight.push(thisDecodeId);
                 this.workers[worker_i].postMessage({
                     type: 'decode',
                     data: {
-                        decode_id: thisDecodeId,
+                        hold_id: holds[hold_i].id,
                         bbox: [
                             holds[hold_i].left,
                             holds[hold_i].top,
@@ -115,7 +209,7 @@
         decode() {
             this.decodeQueue = [];
             holds.forEach((hold, i) => {
-                if (!hold.mask) {
+                if (!hold.contours) {
                     this.decodeQueue.push(i);
                 }
             });
@@ -139,39 +233,12 @@
         }
     }
 
-    let samHandler = new SamHandler();
+    let samHandler;
 
-    let holdsOverlayContainer;
-    let holdsOverlay;
-    let wallImg;
-    let wallImgLoaded = false;
+
+    // == PANZOOM ==============================================================
+
     let panzoom;
-    let clickDisabled = false;
-    let selectedHold = null;
-    let selectedHoldi;
-
-    let allHoldsContoured = false;
-    $: if (holds.every((hold) => hold.mask)) {
-        allHoldsContoured = true;
-        samHandler.cullWorkers();
-        panzoom.resume();
-    }
-   
-    $: if (wallImgLoaded && panzoom) {
-        let zoom = Math.min(
-            holdsOverlayContainer.clientWidth / wallImg.width,
-            holdsOverlayContainer.clientHeight / wallImg.height);
-        panzoom.zoomTo(0, 0, zoom);
-        panzoom.moveBy((holdsOverlayContainer.clientWidth - zoom * wallImg.width) / 2, 0);
-        panzoom.pause();
-        segmentHolds();
-    }
-    $: if (wallImg) {
-        wallImg.onload = () => {
-            wallImgLoaded = true;
-        };
-    };
-
     $: if (holdsOverlay) {
         panzoom = createPanZoom(holdsOverlay, {
             maxZoom: 10,
@@ -181,10 +248,39 @@
         });
     }
 
-    function handleHoldClick(event) {
-        if (clickDisabled) {
+    function recenter() {
+        panzoom.zoomAbs(0, 0, 1);
+        let zoom = Math.min(
+            holdsOverlayContainer.clientWidth / wallImg.width,
+            holdsOverlayContainer.clientHeight / wallImg.height);
+        panzoom.zoomTo(0, 0, zoom);
+        panzoom.moveTo(
+            (holdsOverlayContainer.clientWidth - zoom * wallImg.naturalWidth) / 2,
+            (holdsOverlayContainer.clientHeight - zoom * wallImg.naturalHeight) / 2);
+    }
+   
+    // TODO: do all this as part of image load function instead of reactively
+    $: if (wallImgLoaded && panzoom) {
+        recenter();
+        segmentHolds();
+    }
+    $: if (wallImg) {
+        wallImg.onload = () => {
+            wallImgLoaded = true;
+        };
+    };
+    function segmentHolds() {
+        if (!wallImgURL) {
             return;
         }
+        samHandler.segment(wallImgURL);
+        samHandler.decode();
+    }
+
+
+    // == EDITOR ===============================================================
+
+    function handleHoldClick(event) {
         let candidates = [];
         for (let hold of holds) {
             if (event.offsetY >= hold.top
@@ -213,8 +309,10 @@
 
     function handleHoldKeypress(hold) {
         selectedHold = hold;
+        selectedHoldi = holds.findIndex((h) => h?.id != null && h.id == selectedHold.id); // TODO: awk
     }
 
+    // bbox resizing
     let resizingDir;
     function startHoldResize(e, dir) {
         e.preventDefault();
@@ -259,9 +357,28 @@
         }
     }
 
+    function getViewRect(size=0.6) {
+        if (!(holdsOverlay && holdsOverlayContainer)) {
+            return;
+        }
+        let insetStart = (1 - size) / 2;
+        let insetEnd = 1 - insetStart;
+        let containerRect = holdsOverlayContainer.getBoundingClientRect();
+        let transform = panzoom.getTransform()
+        let zoom = transform.scale;
+        let panX = transform.x;
+        let panY = transform.y;
+        return {
+            left: -1/zoom * (panX - containerRect.width * insetStart),
+            top: -1/zoom * (panY - containerRect.height * insetStart),
+            right: -1/zoom * (panX - containerRect.width * insetEnd),
+            bottom: -1/zoom * (panY - containerRect.height * insetEnd)
+        }
+    }
+
+    let bboxPreview;
     function previewAddHold() {
-        // TODO: implement new hold preview
-        return;
+        bboxPreview = getViewRect(0.6);
     }
 
     function addHold() {
@@ -285,33 +402,61 @@
         selectedHoldi = holds.length - 1;
         samHandler.decodeOne(selectedHoldi);
     }
-
-    function segmentHolds() {
-        if (!wallImgURL) {
-            return;
-        }
-        samHandler.segment(wallImgURL);
-        samHandler.decode();
-    }
 </script>
 
 
 <style>
     main {
         width: 100%;
+        height: 70vh;
         margin: auto;
         position: relative;
         overflow: hidden;
+        border-radius: 10px;
+        background-image: radial-gradient(var(--color-greeblies) 1.5px, rgba(0, 0, 0, 0.1) 1.5px);
+        background-size: 26px 26px;
+    }
+
+    main:after {
+        content: "";
+        box-shadow: inset 0 0 5px;
+        height: 100%;
+        position: absolute;
+        width: 100%;
+        left: 0px;
+        top: 0px;
+        pointer-events: none;
+    }
+
+    .disabled {
+        pointer-events: none;
+    }
+
+    svg.deemph {
+        color: #a8a5a4;
+        stroke: #a8a5a4;
+        fill: #e4dfdb;
+        font-size: 0.8em;
+    }
+
+    .button {
+        background-color: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 1em;
+        padding: 0.5em;
+        /* border: 1px solid var(--color-background); */
+        border-radius: 10px;
+    }
+
+    .button:hover {
+        background-color: var(--color-hover-background);
     }
 
     #holdsUIContainer {
         position: relative;
-        overflow: hidden;
-        height: 60vh;
-        box-shadow: inset 0 0 3px;
-        border-radius: 0 0 10px 10px;
-        background-image: radial-gradient(var(--color-greeblies) 1.5px, rgba(0, 0, 0, 0.1) 1.5px);
-        background-size: 26px 26px;
+        height: 100%;
+        width: 100%;
     }
 
     #holdsUI {
@@ -337,12 +482,8 @@
 
     .glow {
         opacity: 1;
-        animation: reveal 1s ease-in-out forwards;
+        animation: reveal 2s ease-in-out forwards;
     }
-
-    /* TODO: find a way to disable this animation when showing all hold contours at once */
-    /*       (it lags like crazy with more than a couple hundred holds) */
-    /* TODO: keep the base contour (aside from glow) even after glow finishes */
 
     @keyframes reveal {
         0% {
@@ -361,47 +502,80 @@
         cursor: ns-resize;
     }
 
-    #controls {
-        position: relative;
-        z-index: 10;
-        width: 100%;
-        min-width: 10%;
-        margin: auto;
+    .infoBox {
+        position: absolute;
+        margin: 0.5em;
         box-shadow: 0 0 3px black;
-        background-color: lightgrey;
-        padding: 0.6em;
-        border-radius: 10px 10px 0 0;
+        background-color: white;
+        border-radius: 10px;
+    }
+
+    #uploadPromptContainer {
+        width: 100%;
+        height: 100%;
         display: flex;
-        flex-direction: row;
-        gap: 0.6em;
+        flex-direction: column;
         justify-content: center;
         align-items: center;
-        box-sizing: border-box;
+    }
+
+    #uploadPrompt {
+        padding: 1em;
+        max-width: 90%;
+        max-height: 90%;
+        width: 40em;
+        height: 20em;
+
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #controls {
+        top: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        line-height: 0;
     }
 
     #controls button {
         border: none;
         background-color: transparent;
         cursor: pointer;
+        padding: 1em;
+    }
+
+    #controls button:hover:not(.deemph) {
+        background-color: var(--color-hover-background);
     }
 
     button.delete {
         color: rgb(194, 15, 15);
     }
 
-    button.deemph {
+    #controls button.deemph {
         color: #918c8a;
+        cursor: default;
     }
 
     #processStatus {
-        position: absolute;
+        padding: 0.3em;
         bottom: 0;
         right: 0;
-        background-color: var(--color-major);
-        color: var(--color-background);
-        padding: 0.5em;
-        margin: 0.5em;
-        border-radius: 10px;
+    }
+
+    @keyframes -global-rotate {
+        0% {
+            transform: rotate(0deg) translate(50%);
+        }
+        100% {
+            transform: rotate(1turn) translate(50%);
+        }
     }
 
     #processStatus p {
@@ -414,24 +588,8 @@
 </style>
 
 <main>
-    <button on:click={(e) => {console.log(panzoom.getTransform())}}>panzoom status</button>
-    <p>{holds.filter((h) => h.mask).length} / {holds.length} holds segmented</p>
-    <p>{numWorkersText}</p>
-    <div id="controls">
-        <!-- TODO: don't propagate pointer events through to the panzoom -->
-        <button on:click={addHold} on:mouseover={previewAddHold} on:focus={previewAddHold}>
-            <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                <path d="M680-80v-120H560v-80h120v-120h80v120h120v80H760v120h-80ZM200-200v-200h80v120h120v80H200Zm0-360v-200h200v80H280v120h-80Zm480 0v-120H560v-80h200v200h-80Z"/>
-            </svg>
-        </button>
-        <button on:click={deleteSelectedHold} class={selectedHoldi != null ? "delete" : "deemph"}>
-            <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                <path fill="currentcolor" d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/>
-            </svg>
-        </button>
-    </div>
-    <div id="holdsUIContainer" bind:this={holdsOverlayContainer} on:touchmove={(e) => e.preventDefault()}>
-        {#if wallImgURL}
+    {#if wallImgURL}
+        <div id="holdsUIContainer" class={allHoldsContoured ? "" : "disabled"} bind:this={holdsOverlayContainer} on:touchmove={(e) => e.preventDefault()}>
             <!-- svelte-ignore a11y-no-static-element-interactions -->
             <!-- svelte-ignore a11y-click-events-have-key-events -->
             <div
@@ -450,13 +608,11 @@
                             <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#1d85bb"></feDropShadow>
                         </filter>
                     </defs>
-                    <!-- <path id="mask-path" class="mask-path" d="" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".8" fill-opacity="0" stroke="#1d85bb" stroke-width="3" filter="url(#glow)"></path> -->
-                    <!-- <animate xlink:href="#contourBlur" attributeName="radius" from="4" to="1" dur="1s" begin="0s" repeatCount="indefinite"></animate> -->
                     {#each holds as hold, i}
-                        {#if hold.mask}
-                            {#each hold.mask as maskPoly}
+                        {#if hold.contours}
+                            {#each hold.contours as contourPoly}
                                 <polygon class={!allHoldsContoured || selectedHoldi == i ? "contour glow" : "contour"}
-                                    points="{maskPoly.map((x, i) => i % 2 === 0 ? `${x},${maskPoly[i + 1]} ` : "").join(' ')}"
+                                    points="{contourPoly.map((x, i) => i % 2 === 0 ? `${x},${contourPoly[i + 1]} ` : "").join(' ')}"
                                     fill="transparent"
                                     stroke="blue"
                                     stroke-width="2"
@@ -464,9 +620,9 @@
                                 ></polygon>
                             {/each}
                             {#if selectedHoldi == i}
-                                {#each hold.mask as maskPoly}
+                                {#each hold.contours as contourPoly}
                                     <polygon class="contour"
-                                        points="{maskPoly.map((x, i) => i % 2 === 0 ? `${x},${maskPoly[i + 1]} ` : "").join(' ')}"
+                                        points="{contourPoly.map((x, i) => i % 2 === 0 ? `${x},${contourPoly[i + 1]} ` : "").join(' ')}"
                                         fill="transparent"
                                         stroke="blue"
                                         stroke-width="2"
@@ -507,24 +663,84 @@
                             ></circle>
                         {/each}
                     {/if}
+                    {#if bboxPreview}
+                        <rect
+                            width="{bboxPreview.right - bboxPreview.left}"
+                            height="{bboxPreview.bottom - bboxPreview.top}"
+                            fill="transparent"
+                            stroke="red"
+                            stroke-width="2"
+                            x="{bboxPreview.left}"
+                            y="{bboxPreview.top}"
+                            stroke-dasharray="4"
+                        ></rect>
+                    {/if}
                 </svg>
             </div>
+        </div>
+        {#if samHandler && holds}
+            {#if samHandler?.workers?.length != null && !holds.every((hold) => hold.contours)}
+                <div id="processStatus" class="infoBox" transition:fly={{x: 50}}>
+                    <p>
+                        <span>Creating workers<LoadingEllipsis active={numWorkersReady < samHandler.workers.length}/> </span>
+                        <span>{numWorkersReady} / {samHandler.workers.length}</span>
+                    </p>
+                    <p>
+                        <span>Encoding image<LoadingEllipsis active={(numWorkersReady > 0) && (numWorkersEmbedded < samHandler.workers.length)}/> </span>
+                        <span>{numWorkersEmbedded} / {samHandler.workers.length}</span>
+                    </p>
+                    <p>
+                        <span>Segmenting holds<LoadingEllipsis active={numWorkersEmbedded > 0 && numHoldsSegmented < holds.length}/> </span>
+                        <span style="min-width:5em;text-align:end;">{numHoldsSegmented} / {holds.length}</span>
+                    </p>
+                </div>
+            {:else}
+                <div id="controls" class="infoBox" transition:fly={{x: 50}}>
+                    <button on:click={deleteSelectedHold} class={selectedHoldi != null ? "delete" : "deemph"} title="delete hold">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
+                            <path fill="currentcolor" d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/>
+                        </svg>
+                    </button>
+                    <!-- svelte-ignore a11y-mouse-events-have-key-events -->
+                    <button on:click={addHold} on:mouseover={previewAddHold} on:mouseleave={() => bboxPreview = null} title="add hold">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
+                            <path d="M680-80v-120H560v-80h120v-120h80v120h120v80H760v120h-80ZM200-200v-200h80v120h120v80H200Zm0-360v-200h200v80H280v120h-80Zm480 0v-120H560v-80h200v200h-80Z"/>
+                        </svg>
+                    </button>
+                    <button on:click={recenter} title="recenter">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
+                            <path d="M440-42v-80q-125-14-214.5-103.5T122-440H42v-80h80q14-125 103.5-214.5T440-838v-80h80v80q125 14 214.5 103.5T838-520h80v80h-80q-14 125-103.5 214.5T520-122v80h-80Zm40-158q116 0 198-82t82-198q0-116-82-198t-198-82q-116 0-198 82t-82 198q0 116 82 198t198 82Zm0-120q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47Zm0-80q33 0 56.5-23.5T560-480q0-33-23.5-56.5T480-560q-33 0-56.5 23.5T400-480q0 33 23.5 56.5T480-400Zm0-80Z"/>
+                        </svg>
+                    </button>
+                </div>
+            {/if}
         {/if}
-    </div>
-    {#if samHandler && samHandler?.workers?.length > 0 && !holds.every((hold) => hold.mask)}
-        <div id="processStatus" transition:fly={{x: 50}}>
-            <p>
-                <span>Creating workers </span>
-                <span>{samHandlerWorkersReady.filter(x => x).length} / {samHandler.workers.length}</span>
-            </p>
-            <p>
-                <span>Encoding image </span>
-                <span>{samHandlerWorkersEmbedded.filter(x => x == "done").length} / {samHandler.workers.length}</span>
-            </p>
-            <p>
-                <span>Segmenting holds </span>
-                <span>{holds.filter((h) => h.mask).length} / {holds.length}</span>
-            </p>
+    {:else}
+        <div id="uploadPromptContainer">
+            <form id="uploadPrompt" class="infoBox"
+                on:drop|preventDefault|stopPropagation={handleWallImgDrop}
+                on:dragover|preventDefault|stopPropagation={() => draggedOver = true}
+                on:dragenter|preventDefault|stopPropagation={() => draggedOver = true}
+                on:dragleave|preventDefault|stopPropagation={() => draggedOver = false}
+                on:dragend|preventDefault|stopPropagation={() => draggedOver = false}
+            >
+            <svg xmlns="http://www.w3.org/2000/svg" height="96" viewBox="0 -960 960 960" width="96" class="deemph">
+                <path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/>
+                <feComposite operator="in" in2="SourceGraphic"/>
+            </svg>
+                <p>
+                    <label for="wallimg" class="button">Upload a Photo</label>
+                    <input
+                        id="wallimg"
+                        name="wallimg"
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp, image/tiff"
+                        style="display: none;"
+                        bind:files={wallImgFiles}/>
+                    or
+                    <button class="button" on:click|preventDefault|stopPropagation={loadExample}>Try Example</button>
+                </p>
+        </form>
         </div>
     {/if}
 </main>

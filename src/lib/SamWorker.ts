@@ -1,4 +1,5 @@
 // adapted from https://github.com/xenova/transformers.js/blob/main/examples/segment-anything-client/worker.js
+// TODO: investigate error when segmenting more than ~940 holds (with 4 workers)
 
 import { env, SamModel, AutoProcessor, RawImage, Tensor } from "@xenova/transformers";
 import { interpolate, stack } from "@xenova/transformers";
@@ -71,7 +72,7 @@ self.onmessage = async (e) => {
 
     } else if (type === 'decode') {
         console.log("decoding");
-        const {decode_id, bbox, hold_i} = data;
+        const {hold_id, bbox, hold_i} = data;
         let input_boxes = [[bbox]];
         const outputs = await model({
             ...image_embeddings,
@@ -93,7 +94,7 @@ self.onmessage = async (e) => {
                 bestScore = outputs.iou_scores.data[i];
             }
         }
-        const mask = (
+        const contours = (
             await post_process_masks(
                 outputs.pred_masks[0][0][best_mask_i],
                 image_inputs.original_sizes[0],
@@ -105,9 +106,9 @@ self.onmessage = async (e) => {
         self.postMessage({
             type: 'decode_result',
             data: {
-                decode_id: decode_id,
+                hold_id: hold_id,
                 hold_i: hold_i,
-                mask: mask,
+                contours: contours,
                 score: bestScore,
             },
         });
