@@ -1,5 +1,6 @@
 <script lang="ts">
     // TODO: clean up this god component
+    // TODO: figure out why delete button is deemph after adding a hold
 
 	import { fade, fly } from "svelte/transition";
     import createPanZoom from "panzoom";

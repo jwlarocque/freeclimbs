@@ -1,8 +1,7 @@
 // adapted from https://github.com/xenova/transformers.js/blob/main/examples/segment-anything-client/worker.js
-// TODO: investigate error when segmenting more than ~940 holds (with 4 workers)
+// TODO: investigate error when segmenting more than ~940 holds (with 4 workers) (244/246 with 1 worker?)
 
-import { env, SamModel, AutoProcessor, RawImage, Tensor } from "@xenova/transformers";
-import { interpolate, stack } from "@xenova/transformers";
+import { env, SamModel, AutoProcessor, RawImage } from "@xenova/transformers";
 import cv from "@techstark/opencv-js";
 
 env.allowLocalModels = false;
@@ -71,7 +70,6 @@ self.onmessage = async (e) => {
         });
 
     } else if (type === 'decode') {
-        console.log("decoding");
         const {hold_id, bbox, hold_i} = data;
         let input_boxes = [[bbox]];
         const outputs = await model({
@@ -95,14 +93,13 @@ self.onmessage = async (e) => {
             }
         }
         const contours = (
-            await post_process_masks(
-                outputs.pred_masks[0][0][best_mask_i],
+            post_process_masks(
+                outputs.pred_masks[0][0][best_mask_i].data,
                 image_inputs.original_sizes[0],
                 image_inputs.reshaped_input_sizes[0],
                 processor.feature_extractor.pad_size));
 
         // Send the result back to the main thread
-        console.log("done decoding");
         self.postMessage({
             type: 'decode_result',
             data: {
@@ -112,7 +109,6 @@ self.onmessage = async (e) => {
                 score: bestScore,
             },
         });
-
     } else {
         throw new Error(`Unknown message type: ${type}`);
     }
@@ -120,55 +116,48 @@ self.onmessage = async (e) => {
 
 function post_process_masks(mask, original_size, reshaped_input_size, pad_size) {
     // mask: [256, 256]
-    let opencv_mask = cv.matFromArray(256, 256, cv.CV_32FC1, mask.data);
+    let opencv_mask_a = cv.matFromArray(256, 256, cv.CV_32FC1, mask);
     // upscale mask to padded size
     let padded_size = new cv.Size(pad_size.height, pad_size.width);
-    cv.resize(opencv_mask, opencv_mask, padded_size, cv.INTER_LINEAR);
+    // OpenCV.js is a flawless library with no flaws,
+    // so to prevent memory leakage each operation needs to go into a new Mat
+    // which is then deleted.
+    let opencv_mask_b = new cv.Mat();
+    cv.resize(opencv_mask_a, opencv_mask_b, padded_size, cv.INTER_LINEAR);
     // crop mask
     let roi = new cv.Rect(0, 0, reshaped_input_size[1], reshaped_input_size[0]);
-    opencv_mask = opencv_mask.roi(roi);
+    opencv_mask_a = opencv_mask_b.roi(roi);
     // downscale mask
     let downscaled_size = new cv.Size(original_size[1], original_size[0]);
-    cv.resize(opencv_mask, opencv_mask, downscaled_size, cv.INTER_LINEAR);
+    cv.resize(opencv_mask_a, opencv_mask_b, downscaled_size, cv.INTER_LINEAR);
 
     // To 8 bit for contour detection
-    opencv_mask.convertTo(opencv_mask, cv.CV_8UC1);
+    opencv_mask_b.convertTo(opencv_mask_a, cv.CV_8UC1);
     // erode away stray pixels
     let M = cv.Mat.ones(5, 5, cv.CV_8UC1);
-    let anchor = new cv.Point(-1, -1)
-    cv.erode(opencv_mask, opencv_mask, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
-    cv.dilate(opencv_mask, opencv_mask, M, anchor, 2, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+    let anchor = new cv.Point(-1, -1);
+    cv.erode(opencv_mask_a, opencv_mask_b, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+    cv.dilate(opencv_mask_b, opencv_mask_a, M, anchor, 2, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+    
     // find contours (external only)
     let contours = new cv.MatVector();
     let hierarchy = new cv.Mat();
-    cv.findContours(opencv_mask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-    let poly = new cv.MatVector();
+    cv.findContours(opencv_mask_a, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
     let contourArray = [];
+    let tmp = new cv.Mat();
     for (let i = 0; i < contours.size(); i++) {
-        let tmp = new cv.Mat();
         let contour = contours.get(i);
         let epsilon = 0.002 * cv.arcLength(contour, true);
         cv.approxPolyDP(contour, tmp, epsilon, true);
-        // might be a better way to get polygons?
-        poly.push_back(tmp);
-        // TODO: try skipping `poly` again and getting data directly from the contour
-        //       careful of memory leaks (don't send the ArrayBuffer to the main thread)
-        // contourArray.push(tmp.data32S);
-        // be sure to free the memory
-        contour.delete();
-        tmp.delete();
-    }
-    // convert to regular JS nested array
-    for (let i = 0; i < poly.size(); i++) {
-        contourArray.push(Array.from(poly.get(i).data32S));
+        contourArray.push(Array.from(tmp.data32S));
     }
     // free memory again
-    opencv_mask.delete();
+    tmp.delete();
+    opencv_mask_a.delete();
+    opencv_mask_b.delete();
     M.delete();
-    poly.delete();
     contours.delete();
     hierarchy.delete();
 
     return contourArray;
 }
-
