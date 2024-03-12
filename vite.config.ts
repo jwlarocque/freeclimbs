@@ -9,6 +9,16 @@ export default defineConfig({
 				target: "http://127.0.0.1:8000/",
 				changeOrigin: true,
 				rewrite: (path) => path.replace("/detect", "")
+			},
+			"/api": {
+				target: "http://127.0.0.1:8090/",
+				// changeOrigin: true,
+				// rewrite: (path) => path.replace("/api", "")
+			},
+			"/_": {
+				target: "http://127.0.0.1:8090/",
+				// changeOrigin: true,
+				// rewrite: (path) => path.replace("/api", "")
 			}
 		}
 	}

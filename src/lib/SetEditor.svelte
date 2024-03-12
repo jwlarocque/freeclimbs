@@ -44,9 +44,11 @@
 
     // == DETECTION ============================================================
 
+    let detecting = false;
+    let detectionError = null;
     let wallImgFiles:FileList;
     let wallImgURL;
-    let holds:Hold[];
+    export let holds:Hold[];
     
     // drag and drop
     let draggedOver = false;
@@ -63,15 +65,18 @@
 
     function loadExample() {
         // fetch example_holds.json
-        fetch("example_holds.json").then((response) => response.json()).then((data) => {
+        detecting = true;
+        // TODO: handle error
+        fetch("/example_holds.json").then((response) => response.json()).then((data) => {
             holds = data["holds"];
             console.log(holds);
-            wallImgURL = new URL("example_wall.jpg", document.location.origin).toString();
+            wallImgURL = new URL("/example_wall.jpg", document.location.origin).toString();
+            detecting = false;
         });
     }
 
     async function handleWallImgSubmit(files) {
-        console.log(files[0]);
+        detecting = true;
         holds = [];
         if (wallImgURL) { URL.revokeObjectURL(wallImgURL); }
         wallImgURL = null;
@@ -98,7 +103,9 @@
             holds.sort((a, b) => a.top - b.top);
             console.log(holds);
             wallImgURL = URL.createObjectURL(files[0]);
+            detecting = false;
         } catch (error) {
+            detectionError = error;
             console.error(error);
         }
     }
@@ -409,11 +416,10 @@
 <style>
     main {
         width: 100%;
-        height: 70vh;
-        margin: auto;
+        height: 100%;
         position: relative;
         overflow: hidden;
-        border-radius: 10px;
+        border-radius: var(--primary-radius);
         background-image: radial-gradient(var(--color-greeblies) 1.5px, rgba(0, 0, 0, 0.1) 1.5px);
         background-size: 26px 26px;
     }
@@ -427,6 +433,7 @@
         left: 0px;
         top: 0px;
         pointer-events: none;
+        border-radius: var(--primary-radius);
     }
 
     .disabled {
@@ -438,20 +445,6 @@
         stroke: #a8a5a4;
         fill: #e4dfdb;
         font-size: 0.8em;
-    }
-
-    .button {
-        background-color: transparent;
-        border: none;
-        cursor: pointer;
-        font-size: 1em;
-        padding: 0.5em;
-        /* border: 1px solid var(--color-background); */
-        border-radius: 10px;
-    }
-
-    .button:hover {
-        background-color: var(--color-hover-background);
     }
 
     #holdsUIContainer {
@@ -503,15 +496,16 @@
         cursor: ns-resize;
     }
 
+    /* TODO: use sign styling? */
     .infoBox {
         position: absolute;
-        margin: 0.5em;
+        margin: var(--inset);
         box-shadow: 0 0 3px black;
-        background-color: white;
-        border-radius: 10px;
+        background-color: var(--color-major);
+        border-radius: var(--secondary-radius);
     }
 
-    #uploadPromptContainer {
+    .infoBoxContainer {
         width: 100%;
         height: 100%;
         display: flex;
@@ -526,11 +520,27 @@
         max-height: 90%;
         width: 40em;
         height: 20em;
-
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
+    }
+
+    #uploadOptions {
+        display: grid;
+        grid-template-columns: 1fr 0fr 1fr;
+        align-items: baseline;
+        gap: 1em;
+    }
+
+    #uploadOptions > *:first-child {
+        margin-left: auto;
+        margin-right: 0;
+    }
+
+    #uploadOptions > *:last-child {
+        margin-left: 0;
+        margin-right: auto;
     }
 
     #controls {
@@ -548,7 +558,9 @@
         border: none;
         background-color: transparent;
         cursor: pointer;
-        padding: 1em;
+        padding: 0.8em;
+        line-height: 0;
+        border-radius: 0;
     }
 
     #controls button:hover:not(.deemph) {
@@ -565,8 +577,8 @@
     }
 
     #processStatus {
-        padding: 0.3em;
-        bottom: 0;
+        padding: 0.6em;
+        top: 0;
         right: 0;
     }
 
@@ -717,20 +729,28 @@
             {/if}
         {/if}
     {:else}
-        <div id="uploadPromptContainer">
+        <div class="infoBoxContainer">
             <form id="uploadPrompt" class="infoBox"
+                style={detecting ? "pointer-events: none;" : ""}
                 on:drop|preventDefault|stopPropagation={handleWallImgDrop}
                 on:dragover|preventDefault|stopPropagation={() => draggedOver = true}
                 on:dragenter|preventDefault|stopPropagation={() => draggedOver = true}
                 on:dragleave|preventDefault|stopPropagation={() => draggedOver = false}
                 on:dragend|preventDefault|stopPropagation={() => draggedOver = false}
             >
-            <svg xmlns="http://www.w3.org/2000/svg" height="96" viewBox="0 -960 960 960" width="96" class="deemph">
-                <path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/>
-                <feComposite operator="in" in2="SourceGraphic"/>
-            </svg>
-                <p>
-                    <label for="wallimg" class="button">Upload a Photo</label>
+                {#if detecting}
+                    {#if detectionError}
+                        <p>An Error Occured</p>
+                    {:else}
+                        <p>Detecting Holds<LoadingEllipsis active={true}/></p>
+                    {/if}
+                {:else}
+                <svg xmlns="http://www.w3.org/2000/svg" height="96" viewBox="0 -960 960 960" width="96" class="deemph">
+                    <path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/>
+                    <feComposite operator="in" in2="SourceGraphic"/>
+                </svg>
+                <div id="uploadOptions">
+                    <label for="wallimg" class="buttonish buttonDark"><p>Upload Image</p></label>
                     <input
                         id="wallimg"
                         name="wallimg"
@@ -738,10 +758,11 @@
                         accept="image/png, image/jpeg, image/webp, image/tiff"
                         style="display: none;"
                         bind:files={wallImgFiles}/>
-                    or
-                    <button class="button" on:click|preventDefault|stopPropagation={loadExample}>Try Example</button>
-                </p>
-        </form>
+                    <p>or</p>
+                    <button class="buttonish buttonDark" on:click|preventDefault|stopPropagation={loadExample}><p>Try Example</p></button>
+                </div>
+                {/if}
+            </form>
         </div>
     {/if}
 </main>
