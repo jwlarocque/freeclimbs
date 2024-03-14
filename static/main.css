@@ -10,7 +10,7 @@
     --color-delete-hover: #ae2e2e;
     --primary-radius: 20px;
     --secondary-radius: 10px;
-    --inset: 10px;
+    --inset: 5px;
 }
 
 h1, h2, h3, h4, h5, h6, h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
@@ -157,4 +157,8 @@ button p, .buttonLight p, .buttonDark p, .buttonDelete p {
 
 .closeContainer:hover svg {
     fill: black;
+}
+
+.disabled {
+    pointer-events: none;
 }

@@ -1,15 +1,71 @@
 <script lang="ts">
     import { fly } from "svelte/transition";
+    import { pb } from "$lib/pocketbase";
     import { DropdownMenu } from "bits-ui";
 	import type { Hold } from "$lib/Hold";
     import LoadingEllipsis from "$lib/LoadingEllipsis.svelte";
 	import SetEditor from "$lib/SetEditor.svelte";
+    import TextInput from "$lib/TextInput.svelte";
+
+    export let data;
 
     let editorState;
     let showInfo = false;
     let holds:Hold[];
+    let setImgUrl:FileList;
+    let setName = "";
+    let setId;
+    let saving = false;
+    let publishing = false;
 
-    $: console.log(holds);
+    async function fileFromUrl(url) {
+        if (!url) {
+            return null;
+        }
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new File([blob], url.split("/").pop(), {type: blob.type});
+    }
+
+    async function saveSet(draft=true) {
+        if (draft) {
+            saving = true;
+        } else {
+            publishing = true;
+        }
+        try {
+            if (!setId) {
+                const record = await pb.collection("sets").create({
+                    "wall": data.slug,
+                    "name": setName,
+                    "image": await fileFromUrl(setImgUrl),
+                    "holds": holds,
+                    "draft": draft
+                });
+                setId = record.id;
+            } else {
+                await pb.collection("sets").update(setId, {
+                    "name": setName,
+                    "image": await fileFromUrl(setImgUrl),
+                    "holds": holds,
+                    "draft": draft
+                });
+            }
+            if (!draft) {
+                window.location.href = `/wall/${data.slug}/set/${setId}`;
+            }
+        } catch (error) {
+            // TODO: nicer error
+            alert(error);
+            console.error(error);
+        } finally {
+            if (draft) {
+                saving = false;
+            } else {
+                publishing = false;
+            }
+        }
+    }
 </script>
 
 <style>
@@ -20,6 +76,14 @@
         flex-direction: column;
         justify-content: center;
         align-items: center;
+        padding: 0;
+        background-color: var(--color-major);
+        gap: 5px;
+    }
+
+    :global(#nameInput > *) {
+        background-color: var(--color-major);
+        border: 1px solid var(--color-minor);
     }
 
     #info {
@@ -29,12 +93,13 @@
         overflow-y: auto;
         margin: var(--inset);
         max-height: calc(100% - 2em);
+        border-radius: calc(var(--primary-radius) - 10px);
     }
 
     #info > header {
         display: flex;
         flex-direction: row;
-        justify-content: space-between;
+        justify-content: center;
         align-items: center;
         gap: 1em;
         padding: 0;
@@ -59,31 +124,63 @@
         color: var(--color-minor);
     }
 
-    :global(#controls) {
-        position: absolute;
-        top: 0;
-        left: 0;
+    #controls {
         margin: var(--inset);
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
         gap: 1em;
+        margin: 0;
+        width: 100%;
+        color: black;
+    }
+
+    #controls button {
+        display: flex;
+        flex-direction: row;
+    }
+
+    #nameInput {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: row;
+        gap: 1em;
+        margin: 0;
     }
 </style>
 
-<main>
-    <SetEditor bind:autoState={editorState} bind:holds/>
+<main class="sign">
+    {#if true || editorState == "done"}
+        <div id="controls">
+            <div id="nameInput">
+                <TextInput bind:value={setName} placeholder={"Set Name"} />
+            </div>
+            <button
+                on:click={() => saveSet(true)}
+                class={saving || publishing ? "buttonDark disabled" : "buttonDark"}
+            >
+                {#if saving}
+                    Saving<LoadingEllipsis active={true}/>
+                {:else}
+                    Save Draft
+                {/if}
+            </button>
+            <button
+                on:click={() => saveSet(false)}
+                class={saving || publishing ? "buttonDark disabled" : "buttonDark"}
+            >
+                {#if publishing}
+                    Publishing<LoadingEllipsis active={true}/>
+                {:else}
+                    Publish
+                {/if}
+            </button>
+        </div>
+    {/if}
+    <SetEditor bind:autoState={editorState} bind:holds bind:wallImgURL={setImgUrl}/>
     <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div id="info" class="sign" role="note">
-        <header>
-            {#if editorState == "init"}
-                <h3>1. Upload a photo of your wall</h3>
-            {:else if editorState == "processing"}
-                <h3>2. Processing<LoadingEllipsis active={true}/></h3>
-            {:else if editorState == "done"}
-                <h3>3. Correct mistakes</h3>
-            {/if}
-            <button  on:click={() => showInfo = !showInfo} on:keypress={() => showInfo = !showInfo} class="buttonLight">{showInfo ? "Hide" : "Show"} tips</button>
-        </header>
             {#if showInfo}
             {#if editorState == "init"}
                 <ul>
@@ -99,16 +196,15 @@
                 <p>Review the detected holds and correct any errors. Once you publish the Set you'll no longer be able to make any changes, so take your time.</p>
             {/if}
         {/if}
+        <header>
+            {#if editorState == "init"}
+                <h3>1. Upload a photo of your wall</h3>
+            {:else if editorState == "processing"}
+                <h3>2. Processing<LoadingEllipsis active={true}/></h3>
+            {:else if editorState == "done"}
+                <h3>3. Correct mistakes</h3>
+            {/if}
+            <button  on:click={() => showInfo = !showInfo} on:keypress={() => showInfo = !showInfo} class="buttonLight">{showInfo ? "Hide" : "Show"} tips</button>
+        </header>
     </div>
-    {#if true || editorState == "done"}
-        <DropdownMenu.Root>
-            <DropdownMenu.Trigger id="controls">
-                test
-            </DropdownMenu.Trigger>
-        </DropdownMenu.Root>
-        <!-- <div id="controls" transition:fly={{x: -50}}>
-            <button class="buttonLight">Save Draft</button>
-            <button class="buttonLight">Publish</button>
-        </div> -->
-    {/if}
 </main>

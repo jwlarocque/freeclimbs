@@ -47,7 +47,7 @@
     let detecting = false;
     let detectionError = null;
     let wallImgFiles:FileList;
-    let wallImgURL;
+    export let wallImgURL;
     export let holds:Hold[];
     
     // drag and drop
@@ -419,8 +419,8 @@
         height: 100%;
         position: relative;
         overflow: hidden;
-        border-radius: var(--primary-radius);
-        background-image: radial-gradient(var(--color-greeblies) 1.5px, rgba(0, 0, 0, 0.1) 1.5px);
+        border-radius: calc(var(--primary-radius) - 5px);
+        background: url("data:image/svg+xml;utf8,%3Csvg viewBox='0 0 2500 2500' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='0.15' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"), radial-gradient(var(--color-greeblies) 1.5px, rgba(0, 0, 0, 0.1) 1.5px), var(--color-background);
         background-size: 26px 26px;
     }
 
@@ -433,11 +433,7 @@
         left: 0px;
         top: 0px;
         pointer-events: none;
-        border-radius: var(--primary-radius);
-    }
-
-    .disabled {
-        pointer-events: none;
+        border-radius: calc(var(--primary-radius) - 5px);
     }
 
     svg.deemph {
@@ -515,8 +511,9 @@
     }
 
     #uploadPrompt {
+        box-sizing: border-box;
         padding: 1em;
-        max-width: 90%;
+        max-width: calc(100% - 10px);
         max-height: 90%;
         width: 40em;
         height: 20em;

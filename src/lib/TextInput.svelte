@@ -1,5 +1,6 @@
 <script lang="ts">
     export let value = "";
+    export let placeholder = "";
 </script>
 
 <style>
@@ -13,4 +14,4 @@
     }
 </style>
 
-<input type="text" id="this" name="this" bind:value/>
+<input type="text" id="this" name="this" placeholder={placeholder} bind:value/>
