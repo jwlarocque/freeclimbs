@@ -13,9 +13,13 @@
     }
     let setImg;
     let setImgLoaded = false;
+    $: if (set && setImgLoaded) {
+        drawSet(set, canvas);
+    }
     let container;
     let viewer;
     let panzoom;
+    let canvas;
 
     $: if (viewer) {
         panzoom = createPanZoom(viewer, {
@@ -45,6 +49,49 @@
     $: if (setImgLoaded && panzoom) {
         recenter();
     }
+
+    function drawSet(set, canv) {
+        canv.width = setImg.width;
+        canv.height = setImg.height;
+        const ctx = canv.getContext("2d");
+        ctx.beginPath();
+        ctx.rect(0, 0, canv.width, canv.height);
+        for (let i = 0; i < set.holds.length; i++) {
+            const hold = set.holds[i];
+            if (hold.contours) {
+                for (let j = 0; j < hold.contours.length; j++) {
+                    const contourPoly = hold.contours[j];
+                    ctx.moveTo(contourPoly[0], contourPoly[1]);
+                    for (let k = 2; k < contourPoly.length; k += 2) {
+                        ctx.lineTo(contourPoly[k], contourPoly[k + 1]);
+                    }
+                    ctx.lineTo(contourPoly[0], contourPoly[1]);
+                }
+            }
+        }
+        ctx.clip();
+        ctx.drawImage(setImg, 0, 0);
+        ctx.strokeStyle = "blue";
+        ctx.lineWidth = 5;
+        for (let i = 0; i < set.holds.length; i++) {
+            const hold = set.holds[i];
+            if (hold.contours) {
+                for (let j = 0; j < hold.contours.length; j++) {
+                    ctx.beginPath();
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = "rgba(0, 0, 255, 1)";
+                    // ctx.setLineDash([5, 5]);
+                    const contourPoly = hold.contours[j];
+                    ctx.moveTo(contourPoly[0], contourPoly[1]);
+                    for (let k = 2; k < contourPoly.length; k += 2) {
+                        ctx.lineTo(contourPoly[k], contourPoly[k + 1]);
+                    }
+                    ctx.lineTo(contourPoly[0], contourPoly[1]);
+                    ctx.stroke();
+                }
+            }
+        }
+    }
 </script>
 
 <style>
@@ -56,27 +103,37 @@
         overflow: hidden;
     }
 
-    .contours {
+    canvas {
         position: absolute;
         top: 0;
         left: 0;
-        z-index: 10;
         overflow: visible;
     }
 
-    polygon {
-        animation: blink 3s linear infinite;
+    #viewer {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+
     }
 
-    @keyframes blink {
-        33.33% {
-            opacity: 1;
-        }
-        66.66% {
-            opacity: 0;
+    #glint {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0.6;
+        background: linear-gradient(15deg, rgba(255,255,255,0) 45%, rgba(255,255,255,1) 50%, rgba(255,255,255,0) 55%);
+        animation: glint 3s linear infinite;
+    }
+
+    @keyframes glint {
+        0% {
+            transform: translate(0, 100%);
         }
         100% {
-            opacity: 1;
+            transform: translate(0, -100%);
         }
     }
 </style>
@@ -95,43 +152,7 @@
                 alt="the selected set for this climbing wall"
             />
         {/if}
-        {#if set}
-            <svg class="contours" xmlns="http://www.w3.org/2000/svg" version="1.1" width="100%" height="100%">
-                <defs>
-                    <filter id="glow" x="-75%" y="-75%" width="300%" height="300%">
-                        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#1d85bb"></feDropShadow>
-                        <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#1d85bb"></feDropShadow>
-                        <feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="#1d85bb"></feDropShadow>
-                        <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#1d85bb"></feDropShadow>
-                    </filter>
-                    <linearGradient id="grad1" x1="100%" y1="0" x2="0" y2="100%" gradientUnits="userSpaceOnUse">
-                        <stop offset="0" style="stop-color:rgba(255, 255, 255, 0);" />
-                        <stop offset="45%" style="stop-color:rgba(255, 255, 255, 0);" />
-                        <stop offset="50%" style="stop-color:rgba(255, 255, 255, 0.5);" />
-                        <stop offset="55%" style="stop-color:rgba(255, 255, 255, 0);" />
-                        <stop offset="100%" style="stop-color:rgba(255, 255, 255, 0);" />
-                        <!-- <animate attributeName="y1" from="100%" to="-100%" dur="3s" repeatCount="indefinite"/>
-                        <animate attributeName="y2" from="200%" to="0" dur="3s" repeatCount="indefinite"/> -->
-                    </linearGradient>
-                </defs>
-                {#each (set?.holds || []) as hold}
-                    {#if hold?.contours}
-                        {#each (hold?.contours || []) as contourPoly}
-                            <polygon class={"contour"}
-                                points="{contourPoly.map((x, i) => i % 2 === 0 ? `${x},${contourPoly[i + 1]} ` : "").join(' ')}"
-                                fill="transparent"
-                                stroke="blue"
-                                stroke-width="3"
-                                x="{hold.left}"
-                                y="{hold.top}"
-                                stroke-dasharray="4"
-                                filter="url(#glow)"
-                                style="animation-delay: {(hold?.top + hold?.bottom) / 2000}s"
-                            ></polygon>
-                        {/each}
-                    {/if}
-                {/each}
-            </svg>
-        {/if}
+        <div id="glint"></div>
+        <canvas bind:this={canvas}></canvas>
     </div>
 </div>
