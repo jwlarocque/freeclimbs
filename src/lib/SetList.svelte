@@ -27,7 +27,6 @@
         );
         totalItems = records.totalItems;
         pagesSets[page] = records?.items;
-        console.log(records?.items);
         return records?.items;
     }
 </script>
@@ -85,10 +84,10 @@
         {:then sets}
             {#each sets as set}
                 <div
-                    class={selectedSet == set.id ? "set selected" : "set"}
-                    on:click={() => selectedSet = set.id}
-                    on:keydown={() => selectedSet = set.id}
-                    class:selected={selectedSet == set.id}
+                    class={selectedSet.id == set.id ? "set selected" : "set"}
+                    on:click={() => selectedSet = set}
+                    on:keydown={() => selectedSet = set}
+                    class:selected={selectedSet.id == set.id}
                     role="button"
                     tabindex="0"
                 >

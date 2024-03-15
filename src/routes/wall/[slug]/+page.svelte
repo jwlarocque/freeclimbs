@@ -12,16 +12,17 @@
     let doLoadwall = loadWall();
     let deleting = false;
     let showSets = true; // TODO: set to false by default
+    let selectedSet;
 
     async function loadWall() {
         const record = await pb.collection("walls").getOne(
             data.slug, {
                 expand: "current_set"
             });
-        console.log(record);
         if (record && record?.expand?.current_set) {
             imageUrl = `/api/files/${record.expand.current_set.collectionId}/${record.expand.current_set.id}/${record.expand.current_set.image}`;
         }
+        selectedSet = record?.expand?.current_set;
         return record;
     }
 
@@ -102,6 +103,10 @@
         border-radius: calc(var(--primary-radius) - 5px);
     }
 
+    #content > p {
+        padding: 1em;
+    }
+
     #sets {
         flex: 1 1 60em;
         background-color: var(--color-major);
@@ -155,10 +160,10 @@
             <div id="content">
                 {#if showSets}
                     <div id="sets">
-                        <SetList wallId={data.slug} selectedSet={wall?.expand?.current_set?.id}/>
+                        <SetList wallId={data.slug} bind:selectedSet/>
                     </div>
                 {/if}
-                <RouteViewer set={wall?.expand?.current_set} route={null} panzoomEnabled={true}/>
+                <RouteViewer bind:set={selectedSet} route={null} panzoomEnabled={true}/>
                 <!-- TODO: list of routes -->
                 <!-- <img id="wallImg" src={imageUrl} alt="the climbing wall you uploaded"/> -->
             </div>
@@ -171,6 +176,8 @@
                 <p>Wall not found. This wall may not exist or you may not have permission to view it.</p>
             {:else}
                 <p>{error.message}</p>
+                <p>{error.originalError}</p>
+                <!-- <p>{Object.keys(error)}</p> -->
             {/if}
         </div>
     {/await}

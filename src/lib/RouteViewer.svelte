@@ -8,6 +8,7 @@
 
     let imageUrl;
     $: if (set) {
+        console.log(set);
         imageUrl = `/api/files/${set.collectionId}/${set.id}/${set.image}`;
     }
     let setImg;
@@ -54,6 +55,30 @@
         background-size: 26px 26px;
         overflow: hidden;
     }
+
+    .contours {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 10;
+        overflow: visible;
+    }
+
+    polygon {
+        animation: blink 3s linear infinite;
+    }
+
+    @keyframes blink {
+        33.33% {
+            opacity: 1;
+        }
+        66.66% {
+            opacity: 0;
+        }
+        100% {
+            opacity: 1;
+        }
+    }
 </style>
 
 <div
@@ -69,6 +94,44 @@
                 src={imageUrl}
                 alt="the selected set for this climbing wall"
             />
+        {/if}
+        {#if set}
+            <svg class="contours" xmlns="http://www.w3.org/2000/svg" version="1.1" width="100%" height="100%">
+                <defs>
+                    <filter id="glow" x="-75%" y="-75%" width="300%" height="300%">
+                        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#1d85bb"></feDropShadow>
+                        <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#1d85bb"></feDropShadow>
+                        <feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="#1d85bb"></feDropShadow>
+                        <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#1d85bb"></feDropShadow>
+                    </filter>
+                    <linearGradient id="grad1" x1="100%" y1="0" x2="0" y2="100%" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" style="stop-color:rgba(255, 255, 255, 0);" />
+                        <stop offset="45%" style="stop-color:rgba(255, 255, 255, 0);" />
+                        <stop offset="50%" style="stop-color:rgba(255, 255, 255, 0.5);" />
+                        <stop offset="55%" style="stop-color:rgba(255, 255, 255, 0);" />
+                        <stop offset="100%" style="stop-color:rgba(255, 255, 255, 0);" />
+                        <!-- <animate attributeName="y1" from="100%" to="-100%" dur="3s" repeatCount="indefinite"/>
+                        <animate attributeName="y2" from="200%" to="0" dur="3s" repeatCount="indefinite"/> -->
+                    </linearGradient>
+                </defs>
+                {#each (set?.holds || []) as hold}
+                    {#if hold?.contours}
+                        {#each (hold?.contours || []) as contourPoly}
+                            <polygon class={"contour"}
+                                points="{contourPoly.map((x, i) => i % 2 === 0 ? `${x},${contourPoly[i + 1]} ` : "").join(' ')}"
+                                fill="transparent"
+                                stroke="blue"
+                                stroke-width="3"
+                                x="{hold.left}"
+                                y="{hold.top}"
+                                stroke-dasharray="4"
+                                filter="url(#glow)"
+                                style="animation-delay: {(hold?.top + hold?.bottom) / 2000}s"
+                            ></polygon>
+                        {/each}
+                    {/if}
+                {/each}
+            </svg>
         {/if}
     </div>
 </div>
