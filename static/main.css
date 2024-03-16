@@ -33,7 +33,6 @@ body {
     background-image: url("data:image/svg+xml;utf8,%3Csvg viewBox='0 0 2500 2500' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='0.15' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
     display: flex;
     flex-direction: column;
-    gap: 1em;
     box-sizing: border-box;
     height: calc(100vh - 2em);
     overflow: hidden;
@@ -55,7 +54,7 @@ a:hover {
 button, .buttonLight, .buttonDark, .buttonDelete {
     border: transparent;
     border-radius: var(--primary-radius);
-    font-size: 1.2em;
+    font-size: 1.0em;
     line-height: 1;
     display: flex;
     flex-direction: column;
@@ -91,6 +90,16 @@ button, .buttonLight, .buttonDark, .buttonDelete {
 }
 
 .buttonDelete:hover {
+    background-color: var(--color-delete-hover);
+}
+
+.buttonDeleteInverse {
+    color: var(--color-delete);
+    background-color: transparent;
+}
+
+.buttonDeleteInverse:hover {
+    color: var(--color-major);
     background-color: var(--color-delete-hover);
 }
 

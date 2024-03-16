@@ -7,14 +7,14 @@
     export let panzoomEnabled = false;
 
     let imageUrl;
-    $: if (set) {
-        console.log(set);
-        imageUrl = `/api/files/${set.collectionId}/${set.id}/${set.image}`;
-    }
     let setImg;
     let setImgLoaded = false;
+    $: if (set) {
+        setImgLoaded = false;
+        imageUrl = `/api/files/${set.collectionId}/${set.id}/${set.image}`;
+    }
     $: if (set && setImgLoaded) {
-        drawSet(set, canvas);
+        drawSet(set.holds, canvas);
     }
     let container;
     let viewer;
@@ -50,14 +50,14 @@
         recenter();
     }
 
-    function drawSet(set, canv) {
+    function drawSet(holds, canv) {
         canv.width = setImg.width;
         canv.height = setImg.height;
         const ctx = canv.getContext("2d");
         ctx.beginPath();
         ctx.rect(0, 0, canv.width, canv.height);
-        for (let i = 0; i < set.holds.length; i++) {
-            const hold = set.holds[i];
+        for (let i = 0; i < holds.length; i++) {
+            const hold = holds[i];
             if (hold.contours) {
                 for (let j = 0; j < hold.contours.length; j++) {
                     const contourPoly = hold.contours[j];
@@ -72,21 +72,20 @@
         ctx.clip();
         ctx.drawImage(setImg, 0, 0);
         ctx.strokeStyle = "blue";
-        ctx.lineWidth = 5;
-        for (let i = 0; i < set.holds.length; i++) {
-            const hold = set.holds[i];
+        ctx.lineWidth = 10;
+        for (let i = 0; i < holds.length; i++) {
+            const hold = holds[i];
             if (hold.contours) {
                 for (let j = 0; j < hold.contours.length; j++) {
                     ctx.beginPath();
                     ctx.shadowBlur = 10;
                     ctx.shadowColor = "rgba(0, 0, 255, 1)";
-                    // ctx.setLineDash([5, 5]);
                     const contourPoly = hold.contours[j];
                     ctx.moveTo(contourPoly[0], contourPoly[1]);
                     for (let k = 2; k < contourPoly.length; k += 2) {
                         ctx.lineTo(contourPoly[k], contourPoly[k + 1]);
                     }
-                    ctx.lineTo(contourPoly[0], contourPoly[1]);
+                    ctx.closePath();
                     ctx.stroke();
                 }
             }
@@ -145,6 +144,7 @@
     on:touchmove={(e) => e.preventDefault()}
 >
     <div id="viewer" bind:this={viewer}>
+        <!-- TODO: some kind of loading indicator -->
         {#if imageUrl}
             <img
                 bind:this={setImg}

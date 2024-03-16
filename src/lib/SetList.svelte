@@ -3,8 +3,10 @@
     import { pb } from "$lib/pocketbase";
     import { Pagination } from "bits-ui";
 	import LoadingEllipsis from "./LoadingEllipsis.svelte";
+	import ConfirmModal from "./ConfirmModal.svelte";
 
-    export let wallId;
+    export let isOwner = false;
+    export let wall;
     export let selectedSet;
 
     const PAGE_SIZE = 30;
@@ -12,6 +14,11 @@
     let totalItems;
     let currPage = 1;
     let pagesSets = {};
+    let sets;
+    $: console.log(sets);
+    $: if (currPage) {
+        sets = loadSets(currPage);
+    }
 
     // TODO: this will desync if a new set is created while some pages have been
     //       loaded and some have not. Maybe fix.
@@ -22,12 +29,27 @@
         const records = await pb.collection("sets").getList(
             page, PAGE_SIZE, {
                 sort: "-created",
-                filter: `wall = "${wallId}"`
+                filter: `wall = "${wall.id}"`
             }
         );
         totalItems = records.totalItems;
         pagesSets[page] = records?.items;
         return records?.items;
+    }
+
+    // TODO: error and loading
+    async function updateDefaultSet(setId) {
+        await pb.collection("walls").update(wall.id, {
+            "current_set": setId
+        });
+        wall.expand.current_set = (await sets).find((set) => set.id == setId);
+    }
+
+    // TODO: error and loading
+    async function deleteSet(setId) {
+        await pb.collection("sets").delete(setId);
+        currPage = 1;
+        sets = await loadSets(currPage);
     }
 </script>
 
@@ -36,6 +58,37 @@
         display: flex;
         flex-direction: column;
         gap: 5px;
+    }
+
+    .newSetButton {
+        text-decoration: none;
+    }
+
+    .newSetButton button {
+        width: 100%;
+    }
+
+    .set {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1em;
+        position: relative;
+        cursor: pointer;
+        border-radius: var(--primary-radius);
+        padding: 0 1em;
+        transition: background-color 0.1s ease-in-out, transform 0.1s ease-in-out;
+        border: 1px solid transparent;
+    }
+
+    .buttonDarkInverse {
+        color: black;
+        background-color: transparent;
+    }
+
+    .buttonDarkInverse:hover {
+        background-color: var(--color-major);
     }
 
     :global(.paginav) {
@@ -47,16 +100,6 @@
         margin: 0;
         width: 100%;
         color: black;
-    }
-
-    .set {
-        position: relative;
-        cursor: pointer;
-        border-radius: var(--primary-radius);
-        padding: 0 1em;
-        transition: background-color 0.1s ease-in-out, transform 0.1s ease-in-out;
-        
-        border: 1px solid transparent;
     }
 
     /* TODO: better selected and hover styling */
@@ -73,32 +116,55 @@
         padding: 0.25em;
         border-radius: calc(infinity * 1px);
     }
+
+    :global(.paginationButton.current) {
+        text-decoration: underline;
+    }
 </style>
 
 <main>
-    {#await loadSets()}
+    {#if isOwner}
+        <a href={`/wall/${wall.id}/new-set`} class="newSetButton">
+            <button class="buttonDark">
+                <p>New Set</p>
+            </button>
+        </a>
+    {/if}
+    {#await sets}
         <p>Loading sets<LoadingEllipsis active={true}/></p>
-    {:then}
-        {#await loadSets(currPage)}
-        <p>Loading sets<LoadingEllipsis active={true}/></p>
-        {:then sets}
-            {#each sets as set}
-                <div
-                    class={selectedSet.id == set.id ? "set selected" : "set"}
-                    on:click={() => selectedSet = set}
-                    on:keydown={() => selectedSet = set}
-                    class:selected={selectedSet.id == set.id}
-                    role="button"
-                    tabindex="0"
-                >
-                    <!-- TODO: consider loading thumbnail images -->
+    {:then setsCopy}
+        {#each setsCopy as set}
+            <div
+                class={selectedSet.id == set.id ? "set selected" : "set"}
+                on:click={() => selectedSet = set}
+                on:keydown={() => selectedSet = set}
+                role="button"
+                tabindex="0"
+            >
+                <!-- TODO: consider loading thumbnail images -->
+                <div>
                     <p>{set.name}</p>
                     <p class="minor">{(new Date(Date.parse(set.created))).toLocaleDateString()}</p>
-                    <!-- TODO: if owner, option to make current -->
-                    <!-- TODO: if permissions (?), option to delete -->
                 </div>
-            {/each}
-        {/await}
+                <!-- TODO: if owner, option to make current -->
+                <!-- TODO: if permissions (?), option to delete -->
+                {#if isOwner}
+                    {#if wall.expand.current_set.id != set.id}
+                        <button class="buttonDarkInverse" on:click={() => updateDefaultSet(set.id)}>
+                            Make Default
+                        </button>
+                    {/if}
+                    <!-- TODO: onConfirm and onCancel -->
+                    <ConfirmModal buttonText="Delete" buttonClass="buttonDeleteInverse" title="Confirm Deletion">
+                        <div slot="message">
+                            <p>Are you sure you want to delete this set?</p>
+                            <p>This action will also delete this set's Routes and cannot be undone.</p>
+                        </div>
+                        <button slot="confirm" class="buttonDelete" on:click={() => deleteSet(set.id)}>Delete</button>
+                    </ConfirmModal>
+                {/if}
+            </div>
+        {/each}
         <Pagination.Root
             class="paginav"
             count={totalItems}
@@ -113,18 +179,18 @@
                     <path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/>
                 </svg>
             </Pagination.PrevButton>
-                {#each pages as page (page.key)}
-                    {#if page.type == "ellipsis"}
-                        ...
-                    {:else}
-                        <Pagination.Page  class="buttonDark paginationButton" {page}/>
-                    {/if}
-                {/each}
-                <Pagination.NextButton class="buttonDark paginationButton">
-                    <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                        <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
-                    </svg>
-                </Pagination.NextButton>
+            {#each pages as page (page.key)}
+                {#if page.type == "ellipsis"}
+                    ...
+                {:else}
+                    <Pagination.Page  class={page.value == currPage ? "buttonDark paginationButton current" : "buttonDark paginationButton"} {page}/>
+                {/if}
+            {/each}
+            <Pagination.NextButton class="buttonDark paginationButton">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
+                    <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
+                </svg>
+            </Pagination.NextButton>
         </Pagination.Root>
     {/await}
 </main>

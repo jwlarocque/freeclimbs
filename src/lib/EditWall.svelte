@@ -5,7 +5,7 @@
     import { pb } from "$lib/pocketbase";
 	import LoadingEllipsis from "$lib/LoadingEllipsis.svelte";
 
-    export let buttonDark = false;
+    export let buttonClass;
     export let wallId:string = null;
     export let data = {
         "name": "",
@@ -92,7 +92,7 @@
 </style>
 
 <Dialog.Root bind:open={modalOpen}>
-    <Dialog.Trigger class={buttonDark ? "buttonDark" : "buttonLight"}>
+    <Dialog.Trigger class={buttonClass || "buttonLight"}>
         <!-- TODO: replace with a slot? -->
         <p>{wallId ? "Edit" : "New Wall"}</p>
     </Dialog.Trigger>

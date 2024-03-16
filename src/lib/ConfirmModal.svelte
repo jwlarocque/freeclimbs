@@ -2,7 +2,7 @@
     import { Dialog, Separator, Label } from "bits-ui";
 
     export let buttonText = "";
-    export let buttonDark = false;
+    export let buttonClass;
     export let title = "";
     export let message = "";
     export let confirmText = "Confirm";
@@ -27,7 +27,7 @@
 </style>
 
 <Dialog.Root>
-    <Dialog.Trigger  class={buttonDark ? "buttonDark" : "buttonLight"}>
+    <Dialog.Trigger class={buttonClass || "buttonLight"}>
         <p>{buttonText}</p>
     </Dialog.Trigger>
     <Dialog.Portal>

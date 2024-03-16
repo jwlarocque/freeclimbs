@@ -2,17 +2,20 @@
 	import ConfirmModal from '$lib/ConfirmModal.svelte';
 	import EditWall from '$lib/EditWall.svelte';
     import LoadingEllipsis from '$lib/LoadingEllipsis.svelte';
+	import RouteList from '$lib/RouteList.svelte';
 	import RouteViewer from '$lib/RouteViewer.svelte';
 	import SetList from '$lib/SetList.svelte';
-    import { pb } from '$lib/pocketbase.ts';
+    import { pb, authStore } from '$lib/pocketbase.ts';
 
     export let data;
 
     let imageUrl;
     let doLoadwall = loadWall();
     let deleting = false;
-    let showSets = true; // TODO: set to false by default
+    let showSets = false;
     let selectedSet;
+    let showRoutes = false;
+    let selectedRoute;
 
     async function loadWall() {
         const record = await pb.collection("walls").getOne(
@@ -107,22 +110,31 @@
         padding: 1em;
     }
 
-    #sets {
+    #sets, #routes {
         flex: 1 1 60em;
         background-color: var(--color-major);
         width: 60rem;
         max-width: 80%;
         height: 100%;
+        overflow-y: auto;
     }
 
     @media (max-width: 600px) {
-        #sets {
+        #sets, #routes {
             position: absolute;
             z-index: 3;
             top: 0;
-            left: 0;
             border-radius: 0;
+        }
+
+        #sets {
+            left: 0;
             padding-right: 5px;
+        }
+
+        #routes {
+            right: 0;
+            padding-left: 5px;
         }
     }
             
@@ -140,13 +152,13 @@
                     class="buttonDark" 
                     on:click={() => showSets = !showSets}
                 >
-                    Set: {wall?.expand?.current_set?.name || "None"}
+                    Set: {selectedSet.name || "None"}
                 </button>
                 <div>
                     <h3>{wall.name}</h3>
-                    {#if pb.authStore.model?.id == wall.owner}
-                            <EditWall buttonDark={true} wallId={wall.id} data={wall} onUpdate={() => {doLoadwall = loadWall()}}/>
-                            <ConfirmModal buttonText="Delete" buttonDark={true} title="Confirm Deletion">
+                    {#if $authStore.model?.id == wall.owner}
+                            <EditWall buttonClass="buttonDark" wallId={wall.id} data={wall} onUpdate={() => {doLoadwall = loadWall()}}/>
+                            <ConfirmModal buttonText="Delete" buttonClass="buttonDeleteInverse" title="Confirm Deletion">
                                 <div slot="message">
                                     <p>Are you sure you want to delete this wall?</p>
                                     <p>This action will also delete this wall's Sets and Routes and cannot be undone.</p>
@@ -155,17 +167,26 @@
                             </ConfirmModal>
                     {/if}
                 </div>
-                <!-- TODO: if owner, new set and settings -->
+                <button
+                    class="buttonDark" 
+                    on:click={() => showRoutes = !showRoutes}
+                >
+                    Route: {selectedRoute?.name || "None"}
+                </button>
             </header>
             <div id="content">
                 {#if showSets}
                     <div id="sets">
-                        <SetList wallId={data.slug} bind:selectedSet/>
+                        <SetList isOwner={$authStore.model?.id == wall.owner} wall={wall} bind:selectedSet/>
                     </div>
                 {/if}
                 <RouteViewer bind:set={selectedSet} route={null} panzoomEnabled={true}/>
                 <!-- TODO: list of routes -->
-                <!-- <img id="wallImg" src={imageUrl} alt="the climbing wall you uploaded"/> -->
+                {#if showRoutes}
+                    <div id="routes">
+                        <RouteList set={selectedSet} bind:selectedRoute/>
+                    </div>
+                {/if}
             </div>
     {:catch error}
         <header>
