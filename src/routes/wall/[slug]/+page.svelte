@@ -13,9 +13,8 @@
     let imageUrl;
     let doLoadwall = loadWall();
     let deleting = false;
-    let showSets = false;
+    let showControls = true;
     let selectedSet;
-    let showRoutes = false;
     let selectedRoute;
 
     async function loadWall() {
@@ -59,6 +58,19 @@
         overflow: hidden;
     }
 
+    header {
+        position: relative;
+    }
+
+    #toggleControls {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        margin: auto;
+        visibility: hidden;
+    }
+
     :global(.controls) {
         flex: 1 1 20em;
         display: flex;
@@ -81,10 +93,15 @@
         color: black;
         border: 1px solid var(--color-minor);
         border-radius: calc(infinity * 1px);
+        margin-bottom: 5px;
     }
 
     :global(.tabs > *) {
         width: 100%;
+    }
+
+    :global(.tabs > *[data-state="active"]) {
+        background-color: var(--color-hover-background);
     }
 
     #viewer {
@@ -103,16 +120,41 @@
         text-align: center;
     }
 
-    /* TODO: I don't like media queries, and this one is an horrific hack
-             but it does work. */
     @media (max-width: calc(40em + 2em + 15px)) {
+        main {
+            flex-direction: column-reverse;
+            flex-wrap: nowrap;
+        }
+
+        #toggleControls {
+            visibility: visible;
+            transition: transform 0.1s ease-in-out;
+        }
+
+        #toggleControls.flipped {
+            transform: translateY(-50%) rotate(180deg);
+        }
+
         #viewer {
-            height: 50%;
+            width: 100%;
+            flex: 1 1 auto;
         }
 
         :global(.controls) {
-            height: 50%;
+            width: 100%;
+            flex: 1 0 auto;
             max-height: 50%;
+            min-height: 0;
+            overflow-y: hidden;
+        }
+
+        :global(.controls.visible) {
+            min-height: 50%;
+            overflow-y: auto;
+        }
+
+        :global(.hiddenControls) {
+            display: none;
         }
     }
 </style>
@@ -124,33 +166,44 @@
             <h3>Loading Wall<LoadingEllipsis active={true}/></h3>
         </header>
     {:then wall}
-            <Tabs.Root class="controls">
-                <h3>{wall.name}</h3>
-                <Tabs.List class="tabs">
-                    <Tabs.Trigger value="routes" class="buttonDark">Routes</Tabs.Trigger>
-                    <Tabs.Trigger value="sets" class="buttonDark">Sets</Tabs.Trigger>
-                    {#if $authStore.model?.id == wall.owner}
-                        <Tabs.Trigger value="settings" class="buttonDark">Settings</Tabs.Trigger>
-                    {/if}
-                </Tabs.List>
-                <Tabs.Content value="sets" class="tabPanel">
-                    <SetList isOwner={$authStore.model?.id == wall.owner} wall={wall} bind:selectedSet/>
-                </Tabs.Content>
-                <Tabs.Content value="routes" class="tabPanel">
-                    <RouteList set={selectedSet} bind:selectedRoute/>
-                </Tabs.Content>
-                <Tabs.Content value="settings" class="tabPanel">
-                    <div id="settings">
-                        <EditWall buttonClass="buttonDark" wallId={wall.id} data={wall} onUpdate={() => {doLoadwall = loadWall()}}/>
-                        <ConfirmModal buttonText="Delete" buttonClass="buttonDeleteInverse" title="Confirm Deletion">
-                            <div slot="message">
-                                <p>Are you sure you want to delete this wall?</p>
-                                <p>This action will also delete this wall's Sets and Routes and cannot be undone.</p>
-                            </div>
-                            <button slot="confirm" class="buttonDelete" on:click={() => deleteWall(wall.id)}>Delete</button>
-                        </ConfirmModal>
-                    </div>
-                </Tabs.Content>
+            <Tabs.Root class={showControls ? "controls visible" : "controls"}>
+                <!-- TODO: consider putting route name in here -->
+                <header>
+                    <h3>{wall.name}</h3>
+                    <button
+                        class={showControls ? "buttonDark" : "buttonDark flipped"}
+                        id="toggleControls"
+                        on:click={() => showControls = !showControls}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
+                            <path d="M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z"/>
+                        </svg>
+                    </button>
+                </header>
+                <div class={showControls ? "" : "hiddenControls"}>
+                    <Tabs.List class="tabs">
+                        <Tabs.Trigger value="routes" class="buttonDark">Routes</Tabs.Trigger>
+                        <Tabs.Trigger value="sets" class="buttonDark">Sets</Tabs.Trigger>
+                        {#if $authStore.model?.id == wall.owner}
+                            <Tabs.Trigger value="settings" class="buttonDark">Settings</Tabs.Trigger>
+                        {/if}
+                    </Tabs.List>
+                    <Tabs.Content value="sets" class="tabPanel">
+                        <SetList isOwner={$authStore.model?.id == wall.owner} wall={wall} bind:selectedSet/>
+                    </Tabs.Content>
+                    <Tabs.Content value="routes" class="tabPanel">
+                        <RouteList set={selectedSet} bind:selectedRoute/>
+                    </Tabs.Content>
+                    <Tabs.Content value="settings" class="tabPanel">
+                        <!-- TODO: hide if not owner -->
+                        <div id="settings">
+                            <!-- TODO: don't reset wall state on update
+                                       (better to stay on the Settings page)
+                            -->
+                            <EditWall wall={wall} onUpdate={() => {doLoadwall = loadWall()}}/>
+                        </div>
+                    </Tabs.Content>
+                </div>
             </Tabs.Root>
             <div id="viewer">
                 <RouteViewer bind:set={selectedSet} route={null} panzoomEnabled={true}/>

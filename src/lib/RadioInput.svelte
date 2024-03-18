@@ -3,6 +3,7 @@
 
     export let options;
     export let value;
+    export let buttonClass: string = "light";
 
     let intermediaryValue = value;
 
@@ -34,7 +35,14 @@
         align-items: center;
         gap: 0.5em;
         background-color: transparent;
+    }
+
+    :global(.radioGroupItem.light) {
         color: var(--color-major);
+    }
+
+    :global(.radioGroupItem.dark) {
+        color: black;
     }
 
     :global(.indicator) {
@@ -46,6 +54,14 @@
         box-sizing: border-box;
         transition: border-width 0.1s ease-in-out;
     }
+
+    :global(.indicator.light) {
+        border-color: var(--color-major);
+    }
+
+    :global(.indicator.dark) {
+        border-color: black;
+    }
     
     :global(.checked) {
         border-width: 0.3em;
@@ -54,8 +70,10 @@
 
 <RadioGroup.Root bind:value={intermediaryValue} class="radioGroup">
     {#each options as option}
-        <RadioGroup.Item value={option.value} class="radioGroupItem">
-            <RadioGroup.ItemIndicator class={option.value == value ? "indicator checked" : "indicator"} />
+        <RadioGroup.Item value={option.value} class={"radioGroupItem " + buttonClass}>
+            <RadioGroup.ItemIndicator
+                class={(option.value == value ? "indicator checked " : "indicator ") + buttonClass}
+            ></RadioGroup.ItemIndicator>
             <Label.Root>{option.label}</Label.Root>
         </RadioGroup.Item>
     {/each}

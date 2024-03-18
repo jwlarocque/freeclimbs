@@ -13,7 +13,6 @@
     let currPage = 1;
     let pagesRoutes = {};
     let routes;
-    $: console.log(routes);
     $: if (set && currPage) {
         routes = loadRoutes(currPage);
     }
@@ -46,6 +45,7 @@
         display: flex;
         flex-direction: column;
         min-height: 100%;
+        height: 100%;
         gap: 5px;
     }
 
@@ -67,7 +67,7 @@
         {:then routesCopy}
             {#each routesCopy as route}
                 <div
-                    class={selectedRoute.id == route.id ? "route selected" : "route"}
+                    class={selectedRoute?.id == route.id ? "route selected" : "route"}
                     on:click={() => selectedRoute = route}
                     on:keydown={() => selectedRoute = route}
                     role="button"
@@ -75,13 +75,13 @@
                 >
                     <div>
                         <p>{route.name}</p>
-                        <p>{route.description}</p>
                     </div>
                     {#if route.setter == $authStore.model?.id}
+                        <!-- TODO: copy confirm language from EditWall -->
                         <ConfirmModal buttonText="Delete" buttonClass="buttonDeleteInverse" title="Confirm Deletion">
                             <div slot="message">
                                 <p>Are you sure you want to delete this route?</p>
-                                <p>This action will also delete this route and cannot be undone.</p>
+                                <p>This cannot be undone.</p>
                             </div>
                             <button slot="confirm" class="buttonDelete" on:click={() => deleteRoute(route.id)}>Delete</button>
                         </ConfirmModal>
@@ -118,13 +118,13 @@
                 </Pagination.Root>
             {:else}
                 <div id="prompter">
-                    <p>No Routes</p>
+                    <p>No Routes Yet</p>
                 </div>
             {/if}
         {/await}
     {:else}
         <div id="prompter">
-            <p>Select a Set</p>
+            <p>Select or Create a Set</p>
         </div>
     {/if}
 </main>

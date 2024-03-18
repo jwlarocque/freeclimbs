@@ -33,8 +33,14 @@
             }
         );
         totalItems = records.totalItems;
-        pagesSets[page] = records?.items;
-        return records?.items;
+        // if wall.expand.current_set is in the list, set it to the first
+        let tempSets = records?.items;
+        if (wall.expand.current_set.id) {
+            tempSets = tempSets.filter((set) => set.id != wall.expand.current_set.id);
+            tempSets.unshift(wall.expand.current_set);
+        }
+        pagesSets[page] = tempSets;
+        return tempSets;
     }
 
     // TODO: error and loading
@@ -43,6 +49,7 @@
             "current_set": setId
         });
         wall.expand.current_set = (await sets).find((set) => set.id == setId);
+        // TODO: update set order so new default is first
     }
 
     // TODO: error and loading
@@ -54,6 +61,7 @@
 </script>
 
 <style>
+    /* TODO: switch to grid layout so set buttons are in line */
     main {
         display: flex;
         flex-direction: column;
@@ -82,12 +90,21 @@
         border: 1px solid transparent;
     }
 
-    .buttonDarkInverse {
+    /* TODO: better selected and hover styling */
+    .set.selected, .set:hover {
+        background-color: var(--color-hover-background);
+    }
+
+    /* .set.default {
+        border: 1px solid var(--color-background);
+    } */
+
+    .buttonDarkTwo {
         color: black;
         background-color: transparent;
     }
 
-    .buttonDarkInverse:hover {
+    .buttonDarkTwo:hover {
         background-color: var(--color-major);
     }
 
@@ -100,11 +117,6 @@
         margin: 0;
         width: 100%;
         color: black;
-    }
-
-    /* TODO: better selected and hover styling */
-    .set.selected, .set:hover {
-        background-color: var(--color-hover-background);
     }
 
     .minor {
@@ -125,7 +137,8 @@
 <main>
     {#if isOwner}
         <a href={`/wall/${wall.id}/new-set`} class="newSetButton">
-            <button class="buttonDark">
+            <!-- TODO: better styling -->
+            <button class="buttonDarkInverse">
                 <p>New Set</p>
             </button>
         </a>
@@ -133,9 +146,12 @@
     {#await sets}
         <p>Loading sets<LoadingEllipsis active={true}/></p>
     {:then setsCopy}
+        <!-- TODO: if no sets, prompt to create one -->
         {#each setsCopy as set}
             <div
-                class={selectedSet.id == set.id ? "set selected" : "set"}
+                class={
+                    (selectedSet.id == set.id ? "set selected " : "set ")
+                    + (wall.expand.current_set.id == set.id ? "default" : "")}
                 on:click={() => selectedSet = set}
                 on:keydown={() => selectedSet = set}
                 role="button"
@@ -150,7 +166,7 @@
                 <!-- TODO: if permissions (?), option to delete -->
                 {#if isOwner}
                     {#if wall.expand.current_set.id != set.id}
-                        <button class="buttonDarkInverse" on:click={() => updateDefaultSet(set.id)}>
+                        <button class="buttonDarkTwo" on:click={() => updateDefaultSet(set.id)}>
                             Make Default
                         </button>
                     {/if}

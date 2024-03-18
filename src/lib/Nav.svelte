@@ -2,7 +2,7 @@
     import PocketBase from "pocketbase";
 	import LoginModal from "./LoginModal.svelte";
     import { pb, authStore } from './pocketbase';
-	import EditWall from "./EditWall.svelte";
+	import NewWall from "./NewWall.svelte";
 
     async function logout() {
         await pb.authStore.clear();
@@ -42,7 +42,7 @@
 <nav>
     <h1><a href="/">Freeclimbs</a></h1>
     <div>
-        <EditWall isNew={true}/>
+        <NewWall isNew={true}/>
         {#if $authStore.isValid}
             <button class="buttonLight" on:click={logout}><p>Log Out</p></button>
         {:else}

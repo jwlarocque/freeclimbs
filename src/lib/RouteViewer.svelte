@@ -1,26 +1,36 @@
 <script lang="ts">
     // TODO: consider combining this with the SetEditor
+    // TODO: there's sometimes a non-network delay before the image is painted,
+    //       maybe canvas related? Anyways, try to fix.
     import createPanZoom from "panzoom";
+	import LoadingEllipsis from "./LoadingEllipsis.svelte";
 
     export let set;
+    // TODO: if route selected, only highlight holds which are part of it
+    // TODO: consider adding a dark overlay to the rest of the image
     export let route;
     export let panzoomEnabled = false;
 
+    // TODO: reorganize variables and reactivity
+    let lastSet;
     let imageUrl;
     let setImg;
     let setImgLoaded = false;
-    $: if (set) {
-        setImgLoaded = false;
-        imageUrl = `/api/files/${set.collectionId}/${set.id}/${set.image}`;
-    }
-    $: if (set && setImgLoaded) {
-        drawSet(set.holds, canvas);
-    }
     let container;
     let viewer;
     let panzoom;
     let canvas;
 
+    $: if (set) {
+        if (lastSet?.id != set?.id) {
+            setImgLoaded = false;
+        }
+        lastSet = set;
+        imageUrl = `/api/files/${set.collectionId}/${set.id}/${set.image}`;
+    }
+    $: if (set && setImgLoaded) {
+        drawSet(set.holds, canvas);
+    }
     $: if (viewer) {
         panzoom = createPanZoom(viewer, {
             maxZoom: 10,
@@ -28,6 +38,14 @@
             zoomDoubleClickSpeed: 1,
             onTouch: (e) => {return false;}
         });
+    }
+    $: if (setImg) {
+        setImg.onload = () => {
+            setImgLoaded = true;
+        };
+    };
+    $: if (setImgLoaded && panzoom) {
+        recenter();
     }
 
     function recenter() {
@@ -39,15 +57,6 @@
         panzoom.moveTo(
             (container.clientWidth - zoom * setImg.width) / 2,
             (container.clientHeight - zoom * setImg.height) / 2);
-    }
-
-    $: if (setImg) {
-        setImg.onload = () => {
-            setImgLoaded = true;
-        };
-    };
-    $: if (setImgLoaded && panzoom) {
-        recenter();
     }
 
     function drawSet(holds, canv) {
@@ -95,6 +104,7 @@
 
 <style>
     #container {
+        position: relative;
         max-width: 100%;
         height: 100%;
         background: url("data:image/svg+xml;utf8,%3Csvg viewBox='0 0 2500 2500' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='0.15' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"), radial-gradient(var(--color-greeblies) 1.5px, rgba(0, 0, 0, 0.1) 1.5px), var(--color-background);
@@ -117,6 +127,10 @@
 
     }
 
+    #viewer.invisible {
+        visibility: hidden;
+    }
+
     #glint {
         position: absolute;
         top: 0;
@@ -136,6 +150,23 @@
             transform: translate(0, -100%);
         }
     }
+
+    #loadingIndicator {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translateX(-50%) translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+    }
+
+    #loadingIndicator p {
+        color: var(--color-major);
+        margin: 0;
+    }
 </style>
 
 <div
@@ -145,7 +176,6 @@
     on:touchmove={(e) => e.preventDefault()}
 >
     <div id="viewer" bind:this={viewer}>
-        <!-- TODO: some kind of loading indicator -->
         {#if imageUrl}
             <img
                 bind:this={setImg}
@@ -156,4 +186,9 @@
         <div id="glint"></div>
         <canvas bind:this={canvas}></canvas>
     </div>
+    {#if !setImgLoaded}
+        <div id="loadingIndicator" class="sign">
+            <p>Loading Image<LoadingEllipsis active={true}/></p>
+        </div>
+    {/if}
 </div>
