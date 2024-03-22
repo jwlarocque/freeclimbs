@@ -1,6 +1,6 @@
 <script lang="ts">
     import { authStore, pb } from "$lib/pocketbase";
-    import { Pagination } from "bits-ui";
+    import { Pagination, Select } from "bits-ui";
 	import LoadingEllipsis from "./LoadingEllipsis.svelte";
 	import ConfirmModal from "./ConfirmModal.svelte";
 
@@ -49,6 +49,24 @@
         gap: 5px;
     }
 
+    header {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        gap: 5px;
+        padding: 0;
+        width: 100%;
+    }
+
+    header button {
+        width: 100%;
+    }
+
+    :global(#sortTrigger) {
+        width: 100%;
+    }
+
     #prompter {
         flex: 1 1 auto;
         display: flex;
@@ -58,6 +76,24 @@
         width: 100%;
         color: var(--color-minor);
     }
+
+    .route {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1em;
+        position: relative;
+        cursor: pointer;
+        border-radius: var(--primary-radius);
+        padding: 0 1em;
+        transition: background-color 0.1s ease-in-out, transform 0.1s ease-in-out;
+        border: 1px solid transparent;
+    }
+
+    .route.selected, .route:hover {
+        background-color: var(--color-hover-background);
+    }
 </style>
 
 <main>
@@ -65,6 +101,23 @@
         {#await routes}
             <p>Loading routes<LoadingEllipsis active={true}/></p>
         {:then routesCopy}
+            <header>
+                <!-- TODO: sort dropdown -->
+                <Select.Root>
+                    <Select.Trigger id="sortTrigger" class="buttonDarkInverse">
+                        <p>Sort</p>
+                    </Select.Trigger>
+                    <Select.Content class="sign">
+                        <Select.Item value="name">
+                            <p>Name</p>
+                        </Select.Item>
+                        <Select.Item value="created">
+                            <p>Created</p>
+                        </Select.Item>
+                    </Select.Content>
+                </Select.Root>
+                <!-- TODO: filter dropdowns -->
+            </header>
             {#each routesCopy as route}
                 <div
                     class={selectedRoute?.id == route.id ? "route selected" : "route"}

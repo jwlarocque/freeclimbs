@@ -104,7 +104,7 @@
         <br/>
         You can change this setting at any time, but doing so will only affect future training datasets we create from that point on.
     </p>
-    <button class="submit buttonDark" disabled={!submitEnabled || awaitingSave} on:click|preventDefault|stopPropagation={createUpdateWall}>
+    <button class="submit buttonDarkInverse" disabled={!submitEnabled || awaitingSave} on:click|preventDefault|stopPropagation={createUpdateWall}>
         {#if awaitingSave}
             Updating<LoadingEllipsis active={true}/>
         {:else}

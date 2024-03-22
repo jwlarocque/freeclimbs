@@ -137,7 +137,7 @@ function post_process_masks(mask, original_size, reshaped_input_size, pad_size) 
     let M = cv.Mat.ones(5, 5, cv.CV_8UC1);
     let anchor = new cv.Point(-1, -1);
     cv.erode(opencv_mask_a, opencv_mask_b, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
-    cv.dilate(opencv_mask_b, opencv_mask_a, M, anchor, 2, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+    cv.dilate(opencv_mask_b, opencv_mask_a, M, anchor, 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
     
     // find contours (external only)
     let contours = new cv.MatVector();

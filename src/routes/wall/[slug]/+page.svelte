@@ -2,6 +2,7 @@
 	import ConfirmModal from '$lib/ConfirmModal.svelte';
 	import EditWall from '$lib/EditWall.svelte';
     import LoadingEllipsis from '$lib/LoadingEllipsis.svelte';
+	import RadioInput from '$lib/RadioInput.svelte';
 	import RouteList from '$lib/RouteList.svelte';
 	import RouteViewer from '$lib/RouteViewer.svelte';
 	import SetList from '$lib/SetList.svelte';
@@ -12,10 +13,62 @@
 
     let imageUrl;
     let doLoadwall = loadWall();
-    let deleting = false;
     let showControls = true;
     let selectedSet;
+    let lastSelectedSet;
     let selectedRoute;
+    let creatingRoute = false;
+    let newHoldType = "holds";
+    const holdsTypes = ["start", "finish", "holds"];
+    
+    // TODO: put this in a lib
+    function onRouteViewerClick(event) {
+        if (!selectedSet?.holds) {
+            return;
+        }
+        let candidates = [];
+        for (let hold of selectedSet.holds) {
+            if (event.offsetY >= hold.top
+                && event.offsetY <= hold.bottom
+                && event.offsetX >= hold.left
+                && event.offsetX <= hold.right
+            ){
+                candidates.push(hold);
+            }
+        }
+        if (!candidates || candidates.length == 0) {
+            return;
+        }
+        candidates.sort((a, b) => {
+            let adx = ((a.left + a.right) / 2 - event.offsetX) ** 2;
+            let ady = ((a.top + a.bottom) / 2 - event.offsetY) ** 2;
+            let bdx = ((b.left + b.right) / 2 - event.offsetX) ** 2;
+            let bdy = ((b.top + b.bottom) / 2 - event.offsetY) ** 2;
+            return (adx + ady) - (bdx + bdy);
+        });
+        let oldHoldType;
+        for (let holdType of holdsTypes) {
+            if (selectedRoute.holds[holdType].includes(candidates[0].id)) {
+                oldHoldType = holdType;
+                break;
+            }
+        }
+        if (oldHoldType) {
+            selectedRoute.holds[oldHoldType].splice(selectedRoute.holds[oldHoldType].indexOf(candidates[0].id), 1);
+        }
+        if (newHoldType != oldHoldType) {
+            selectedRoute.holds[newHoldType].push(candidates[0].id);
+        }
+        selectedRoute.holds = selectedRoute.holds;
+    }
+
+    // clear selected route when selected set changes
+    // TODO: kinda awk
+    $: if (selectedSet && lastSelectedSet != selectedSet) {
+        lastSelectedSet = selectedSet;
+        selectedRoute = null;
+        creatingRoute = false;
+    }
 
     async function loadWall() {
         const record = await pb.collection("walls").getOne(
@@ -27,17 +80,6 @@
         }
         selectedSet = record?.expand?.current_set;
         return record;
-    }
-
-    async function deleteWall(id) {
-        deleting = true;
-        try {
-            await pb.collection("walls").delete(id);
-            window.location.href = "/";
-        } catch (error) {
-            deleting = false;
-            console.error(error);
-        }
     }
 </script>
 
@@ -102,6 +144,12 @@
 
     :global(.tabs > *[data-state="active"]) {
         background-color: var(--color-hover-background);
+    }
+
+    :global(.tabPanel > div) {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
     }
 
     #viewer {
@@ -192,10 +240,26 @@
                         <SetList isOwner={$authStore.model?.id == wall.owner} wall={wall} bind:selectedSet/>
                     </Tabs.Content>
                     <Tabs.Content value="routes" class="tabPanel">
-                        <RouteList set={selectedSet} bind:selectedRoute/>
+                        <!-- TODO: put all this in a component -->
+                        <div>
+                            {#if creatingRoute}
+                                <div>
+                                    <button class="buttonDarkInverse" on:click={() => {creatingRoute = false; selectedRoute = null;}}>Cancel</button>
+                                    <button class="buttonDarkInverse">Save</button>
+                                </div>
+                                <!-- TODO: style these radio buttons to match RouteViewer hold outlines -->
+                                <RadioInput
+                                    options={[{label: "Start", value: "start"}, {label: "Finish", value: "finish"}, {label: "Normal", value: "holds"}]}
+                                    bind:value={newHoldType}
+                                    buttonClass="dark"
+                                />
+                            {:else}
+                                <button class="buttonDarkInverse" on:click={() => {creatingRoute = true; selectedRoute = {"holds": {"holds": [], "start": [], "finish": []}};}}>New Route</button>
+                                <RouteList set={selectedSet} bind:selectedRoute/>
+                            {/if}
+                        </div>
                     </Tabs.Content>
                     <Tabs.Content value="settings" class="tabPanel">
-                        <!-- TODO: hide if not owner -->
                         <div id="settings">
                             <!-- TODO: don't reset wall state on update
                                        (better to stay on the Settings page)
@@ -206,7 +270,12 @@
                 </div>
             </Tabs.Root>
             <div id="viewer">
-                <RouteViewer bind:set={selectedSet} route={null} panzoomEnabled={true}/>
+                <RouteViewer
+                    bind:set={selectedSet}
+                    route={selectedRoute}
+                    panzoomEnabled={true}
+                    onClick={creatingRoute ? onRouteViewerClick : () => {}}
+                />
             </div>
     {:catch error}
         <!-- TODO: check that this still works -->

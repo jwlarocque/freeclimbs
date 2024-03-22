@@ -288,6 +288,7 @@
 
     // == EDITOR ===============================================================
 
+    // TODO: import from lib
     function handleHoldClick(event) {
         let candidates = [];
         for (let hold of holds) {
