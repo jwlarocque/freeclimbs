@@ -2,10 +2,12 @@
 	import ConfirmModal from '$lib/ConfirmModal.svelte';
 	import EditWall from '$lib/EditWall.svelte';
     import LoadingEllipsis from '$lib/LoadingEllipsis.svelte';
+	import NewRoute from '$lib/NewRoute.svelte';
 	import RadioInput from '$lib/RadioInput.svelte';
 	import RouteList from '$lib/RouteList.svelte';
 	import RouteViewer from '$lib/RouteViewer.svelte';
 	import SetList from '$lib/SetList.svelte';
+	import ChevronDownIcon from '$lib/icons/ChevronDownIcon.svelte';
     import { pb, authStore } from '$lib/pocketbase.ts';
     import { Tabs } from 'bits-ui';
 
@@ -20,6 +22,23 @@
     let creatingRoute = false;
     let newHoldType = "holds";
     const holdsTypes = ["start", "finish", "holds"];
+
+    function resetRoute() {
+        selectedRoute = {
+            "set": selectedSet.id,
+            "setter": pb.authStore.model?.id,
+            "name": "",
+            "setter_grade": 0,
+            "free_feet": false,
+            "top_out": false,
+            "draft": true,
+            "holds": {
+                "start": [],
+                "finish": [],
+                "holds": []
+            }
+        };
+    }
     
     // TODO: put this in a lib
     function onRouteViewerClick(event) {
@@ -97,6 +116,7 @@
         gap: 5px;
         padding: 0;
         background-color: var(--color-major);
+        background-image: none;
         overflow: hidden;
     }
 
@@ -214,7 +234,7 @@
             <h3>Loading Wall<LoadingEllipsis active={true}/></h3>
         </header>
     {:then wall}
-            <Tabs.Root class={showControls ? "controls visible" : "controls"}>
+            <Tabs.Root class={showControls ? "controls light visible" : "controls light"}>
                 <!-- TODO: consider putting route name in here -->
                 <header>
                     <h3>{wall.name}</h3>
@@ -223,9 +243,7 @@
                         id="toggleControls"
                         on:click={() => showControls = !showControls}
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                            <path d="M480-345 240-585l56-56 184 184 184-184 56 56-240 240Z"/>
-                        </svg>
+                        <ChevronDownIcon/>
                     </button>
                 </header>
                 <div class={showControls ? "" : "hiddenControls"}>
@@ -243,19 +261,12 @@
                         <!-- TODO: put all this in a component -->
                         <div>
                             {#if creatingRoute}
-                                <div>
-                                    <button class="buttonDarkInverse" on:click={() => {creatingRoute = false; selectedRoute = null;}}>Cancel</button>
-                                    <button class="buttonDarkInverse">Save</button>
-                                </div>
-                                <!-- TODO: style these radio buttons to match RouteViewer hold outlines -->
-                                <RadioInput
-                                    options={[{label: "Start", value: "start"}, {label: "Finish", value: "finish"}, {label: "Normal", value: "holds"}]}
-                                    bind:value={newHoldType}
-                                    buttonClass="dark"
-                                />
+                                <button class="buttonDarkInverse" on:click={() => {creatingRoute = false; selectedRoute = null;}}>Cancel</button>
+                                <!-- TODO: too many bound props, awk -->
+                                <NewRoute selectedSet={selectedSet} bind:newHoldType bind:selectedRoute bind:creatingRoute/>
                             {:else}
-                                <button class="buttonDarkInverse" on:click={() => {creatingRoute = true; selectedRoute = {"holds": {"holds": [], "start": [], "finish": []}};}}>New Route</button>
-                                <RouteList set={selectedSet} bind:selectedRoute/>
+                                <button class="buttonDarkInverse" on:click={() => {creatingRoute = true; resetRoute();}}>New Route</button>
+                                <RouteList set={selectedSet} bind:selectedRoute bind:creatingRoute/>
                             {/if}
                         </div>
                     </Tabs.Content>
