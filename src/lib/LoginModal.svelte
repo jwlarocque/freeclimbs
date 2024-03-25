@@ -1,6 +1,7 @@
 <script lang="ts">
     import { createDialog, melt } from '@melt-ui/svelte';
     import { pb } from './pocketbase';
+	import CloseIcon from './icons/CloseIcon.svelte';
 
     async function login(provider) {
         try {
@@ -46,7 +47,7 @@
         gap: 2em;
     }
 
-    svg.close {
+    .close {
         position: absolute;
         top: var(--inset);
         right: var(--inset);
@@ -58,7 +59,7 @@
         border-radius: var(--primary-radius);
     }
 
-    svg.close:hover {
+    .close:hover {
         background-color: var(--color-hover-background);
         fill: black;
     }
@@ -86,9 +87,9 @@
     {#if $open}
         <div use:melt={$overlay} class="overlay"/>
         <div use:melt={$content} class="sign content">
-            <svg class="close" use:melt={$close} xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
-            </svg>
+            <div class="close" use:melt={$close}>
+                <CloseIcon/>
+            </div>
             <div class="header">
                 <h3 use:melt={$title}>Log In With:</h3>
             </div>

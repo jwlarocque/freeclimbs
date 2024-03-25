@@ -4,6 +4,8 @@
     import { Pagination } from "bits-ui";
 	import LoadingEllipsis from "./LoadingEllipsis.svelte";
 	import ConfirmModal from "./ConfirmModal.svelte";
+	import PrevIcon from "./icons/PrevIcon.svelte";
+	import NextIcon from "./icons/NextIcon.svelte";
 
     export let isOwner = false;
     export let wall;
@@ -28,7 +30,7 @@
         }
         const records = await pb.collection("sets").getList(
             page, PAGE_SIZE, {
-                sort: "-created",
+                sort: "-draft,-created",
                 filter: `wall = "${wall.id}"`
             }
         );
@@ -57,6 +59,7 @@
         await pb.collection("sets").delete(setId);
         currPage = 1;
         sets = await loadSets(currPage);
+        // TODO: close modal and reload Sets
     }
 </script>
 
@@ -191,9 +194,7 @@
         >
             <!-- TODO: disable prev and next buttons when no additional pages -->
             <Pagination.PrevButton class="buttonDark paginationButton">
-                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                    <path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/>
-                </svg>
+                <PrevIcon/>
             </Pagination.PrevButton>
             {#each pages as page (page.key)}
                 {#if page.type == "ellipsis"}
@@ -203,9 +204,7 @@
                 {/if}
             {/each}
             <Pagination.NextButton class="buttonDark paginationButton">
-                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                    <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
-                </svg>
+                <NextIcon/>
             </Pagination.NextButton>
         </Pagination.Root>
     {/await}

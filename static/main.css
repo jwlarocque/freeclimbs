@@ -1,9 +1,7 @@
 :root {
     --color-major: #fdf5ec;
     --color-minor: #9e9994;
-    /* --color-background: #040f07; */
     --color-background: #0f0c09;
-    /* --color-background: #f5c31e; */
     --color-background-two: #29190a;
     --color-hover-background: #ddd6cf;
     --color-greeblies: #83817d;
@@ -31,7 +29,7 @@ h3 {
 
 body {
     background-color: var(--color-background);
-    margin: 1em;
+    margin: var(--inset);
     background-image: url("data:image/svg+xml;utf8,%3Csvg viewBox='0 0 2500 2500' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='0.15' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
     display: flex;
     flex-direction: column;

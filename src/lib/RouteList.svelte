@@ -3,9 +3,12 @@
     import { Pagination, Select } from "bits-ui";
 	import LoadingEllipsis from "./LoadingEllipsis.svelte";
 	import ConfirmModal from "./ConfirmModal.svelte";
+	import PrevIcon from "./icons/PrevIcon.svelte";
+	import NextIcon from "./icons/NextIcon.svelte";
 
     export let set;
     export let selectedRoute;
+    export let creatingRoute;
 
     const PAGE_SIZE = 30;
 
@@ -13,8 +16,27 @@
     let currPage = 1;
     let pagesRoutes = {};
     let routes;
+    // workaround for https://github.com/sveltejs/svelte/issues/5689
+    // (doesn't prevent double render on load, but does fix rerender on
+    //  selectedRoute change which is good enough for now)
+    let routesStale = true;
+    let lastCurrPage;
+    let lastSetId;
     $: if (set && currPage) {
-        routes = loadRoutes(currPage);
+        if (lastSetId != set.id || lastCurrPage != currPage) {
+            routesStale = true;
+        }
+        lastSetId = set.id;
+        lastCurrPage = currPage;
+    }
+    $: if (set && routesStale) {
+        pagesRoutes = {};
+        routes = [];
+        if (currPage) {
+            console.log(set, currPage);
+            routes = loadRoutes(currPage);
+            routesStale = false;
+        }
     }
 
     // TODO: error and loading
@@ -24,8 +46,8 @@
         }
         const records = await pb.collection("routes").getList(
             page, PAGE_SIZE, {
-                sort: "-created",
-                filter: `set = "${set.id}"`
+                sort: "-draft,-created",
+                filter: `set="${set.id}"`
             }
         );
         totalItems = records.totalItems;
@@ -91,8 +113,19 @@
         border: 1px solid transparent;
     }
 
+    .route.draft {
+        color: var(--color-minor);
+    }
+
     .route.selected, .route:hover {
         background-color: var(--color-hover-background);
+    }
+
+    .route > div {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.5em;
     }
 </style>
 
@@ -118,27 +151,32 @@
                 </Select.Root>
                 <!-- TODO: filter dropdowns -->
             </header>
-            {#each routesCopy as route}
+            {#each routesCopy as route (route.id)}
                 <div
-                    class={selectedRoute?.id == route.id ? "route selected" : "route"}
+                    class={"route " + (selectedRoute?.id == route.id ? "selected" : "") + (route.draft ? " draft" : "")}
                     on:click={() => selectedRoute = route}
                     on:keydown={() => selectedRoute = route}
                     role="button"
                     tabindex="0"
                 >
                     <div>
-                        <p>{route.name}</p>
+                        <p>{route.name + (route.draft ? " (Draft)" : "")}</p>
                     </div>
-                    {#if route.setter == $authStore.model?.id}
-                        <!-- TODO: copy confirm language from EditWall -->
-                        <ConfirmModal buttonText="Delete" buttonClass="buttonDeleteInverse" title="Confirm Deletion">
-                            <div slot="message">
-                                <p>Are you sure you want to delete this route?</p>
-                                <p>This cannot be undone.</p>
-                            </div>
-                            <button slot="confirm" class="buttonDelete" on:click={() => deleteRoute(route.id)}>Delete</button>
-                        </ConfirmModal>
-                    {/if}
+                    <div>
+                        {#if route.setter == $authStore.model?.id}
+                            {#if route.draft}
+                                <button class="buttonDark" on:click={() => {selectedRoute = route; creatingRoute = true;}}>Edit</button>
+                            {/if}
+                            <!-- TODO: copy confirm language from EditWall -->
+                            <ConfirmModal buttonText="Delete" buttonClass="buttonDeleteInverse" title="Confirm Deletion">
+                                <div slot="message">
+                                    <p>Are you sure you want to delete this route?</p>
+                                    <p>This cannot be undone.</p>
+                                </div>
+                                <button slot="confirm" class="buttonDelete" on:click={() => deleteRoute(route.id)}>Delete</button>
+                            </ConfirmModal>
+                        {/if}
+                    </div>
                 </div>
             {/each}
             {#if routesCopy.length > 0}
@@ -152,9 +190,7 @@
                 >
                     <!-- TODO: disable prev and next buttons when no additional pages -->
                     <Pagination.PrevButton class="buttonDark paginationButton">
-                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                            <path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/>
-                        </svg>
+                        <PrevIcon/>
                     </Pagination.PrevButton>
                     {#each pages as page (page.key)}
                         {#if page.type == "ellipsis"}
@@ -164,9 +200,7 @@
                         {/if}
                     {/each}
                     <Pagination.NextButton class="buttonDark paginationButton">
-                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                            <path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/>
-                        </svg>
+                        <NextIcon/>
                     </Pagination.NextButton>
                 </Pagination.Root>
             {:else}

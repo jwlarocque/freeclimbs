@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Dialog, Separator, Label } from "bits-ui";
+	import CloseIcon from "./icons/CloseIcon.svelte";
 
     export let buttonText = "";
     export let buttonClass;
@@ -36,9 +37,7 @@
             <header>
                 <h3>{title}</h3>
                 <Dialog.Close class="closeContainer">
-                    <svg class="close" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                        <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
-                    </svg>
+                    <CloseIcon/>
                 </Dialog.Close>
             </header>
             <slot name="message"/>

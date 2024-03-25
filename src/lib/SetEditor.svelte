@@ -9,6 +9,9 @@
     import SamWorker from "$lib/SamWorker?worker";
 	import { onMount } from "svelte";
 	import LoadingEllipsis from "./LoadingEllipsis.svelte";
+	import RecenterIcon from "./icons/RecenterIcon.svelte";
+	import DeleteIcon from "./icons/DeleteIcon.svelte";
+	import AddHoldIcon from "./icons/AddHoldIcon.svelte";
 
 
     export let autoState = "init";
@@ -708,20 +711,14 @@
             {:else}
                 <div id="controls" class="infoBox" transition:fly={{x: 50}}>
                     <button on:click={deleteSelectedHold} class={selectedHoldi != null ? "delete" : "deemph"} title="delete hold">
-                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                            <path fill="currentcolor" d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/>
-                        </svg>
+                        <DeleteIcon/>
                     </button>
                     <!-- svelte-ignore a11y-mouse-events-have-key-events -->
                     <button on:click={addHold} on:mouseover={previewAddHold} on:mouseleave={() => bboxPreview = null} title="add hold">
-                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                            <path d="M680-80v-120H560v-80h120v-120h80v120h120v80H760v120h-80ZM200-200v-200h80v120h120v80H200Zm0-360v-200h200v80H280v120h-80Zm480 0v-120H560v-80h200v200h-80Z"/>
-                        </svg>
+                        <AddHoldIcon/>
                     </button>
                     <button on:click={recenter} title="recenter">
-                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                            <path d="M440-42v-80q-125-14-214.5-103.5T122-440H42v-80h80q14-125 103.5-214.5T440-838v-80h80v80q125 14 214.5 103.5T838-520h80v80h-80q-14 125-103.5 214.5T520-122v80h-80Zm40-158q116 0 198-82t82-198q0-116-82-198t-198-82q-116 0-198 82t-82 198q0 116 82 198t198 82Zm0-120q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47Zm0-80q33 0 56.5-23.5T560-480q0-33-23.5-56.5T480-560q-33 0-56.5 23.5T400-480q0 33 23.5 56.5T480-400Zm0-80Z"/>
-                        </svg>
+                        <RecenterIcon/>
                     </button>
                 </div>
             {/if}

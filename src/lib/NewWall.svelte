@@ -5,6 +5,7 @@
 	import TextInput from "$lib/TextInput.svelte";
     import { pb } from "$lib/pocketbase";
 	import LoadingEllipsis from "$lib/LoadingEllipsis.svelte";
+	import CloseIcon from "./icons/CloseIcon.svelte";
 
     export let buttonClass;
     export let wallId:string = null;
@@ -103,9 +104,7 @@
         <Dialog.Content class="sign modalContent">
             <h3>{wallId ? "Edit" : "New"} Wall</h3>
             <Dialog.Close class="closeContainer">
-                <svg class="close" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-                    <path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/>
-                </svg>
+                <CloseIcon/>
             </Dialog.Close>
             <form>
                 <p>Name</p>
