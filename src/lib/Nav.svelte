@@ -15,7 +15,7 @@
         display: flex;
         flex-direction: row;
         justify-content: space-between;
-        gap: 1em;
+        gap: min(1em, 2dvw);
         align-items: center;
         flex-wrap: wrap;
     }
@@ -24,7 +24,8 @@
         display: flex;
         flex-direction: row;
         justify-content: flex-end;
-        gap: 1em;
+        flex-wrap: wrap;
+        gap: min(1em, 2dvw);
     }
 
     h1 {
@@ -40,7 +41,7 @@
 </style>
 
 <nav>
-    <h1><a href="/">Freeclimbs</a></h1>
+    <a href="/"><h1>Freeclimbs</h1></a>
     <div>
         <NewWall isNew={true}/>
         {#if $authStore.isValid}

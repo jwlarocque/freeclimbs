@@ -20,11 +20,11 @@ h1, h2, h3, h4, h5, h6, h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
 
 h1 {
     font-weight: bold;
-    font-size: min(4em, 10vw);
+    font-size: min(4em, 8dvw);
 }
 
 h3 {
-    font-size: min(1.8em, 6vw);
+    font-size: min(1.8em, 6dvw);
 }
 
 body {
@@ -34,7 +34,7 @@ body {
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    height: calc(100dvh - 2em);
+    height: calc(100dvh - 2 * var(--inset));
     overflow: hidden;
 }
 

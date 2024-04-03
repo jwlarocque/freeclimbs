@@ -1,38 +1,52 @@
-# create-svelte
+# Freeclimbs
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).
+Free and open source route book for home climbing and spray walls. 
 
-## Creating a project
+## Roadmap
 
-If you're seeing this, you've probably already done this step. Congrats!
+Launch:
+- Styling
+    - Unify?
+    - Buttons
+- Add Wall Select (home page)
+- Store current Set and Route as URL params
+- Sets
+    - Clone + Edit as new Set
+    - Edit existing (draft) Sets
+    - Always show current Set at top of list
+    - Thumbnails (?)
+- Sharing links
+    - QR codes
+- Sends, ratings, and climber grades
+- Filter and search Routes
+- More auth options (Google at minimum)
+- Set Creation Demo for unauthed users
+- User settings
+    - Grading system (font/hueco/dankyu)
+- API rate limiting (just use nginx?)
+- Global admin settings (e.g. disallow Wall creation)
+- GDPR
+    - Don't load fonts from Google
+    - Don't load models from Hugging Face
+- Moderation
+    - Banned users (readonly-ify on backend)
 
-```bash
-# create a new project in the current directory
-npm create svelte@latest
+Up Next:
+- More detailed new Set instructions (particularly for error correction step)
+- CI
+- Climbing rating aggregation (not just mean)
+- More login options (including username/password)
 
-# create a new project in my-app
-npm create svelte@latest my-app
-```
+Planned:
+- Svelte 5
+- transformers.js v3 / WebGPU, batch segmentation
+- Projector mode (use a projector to light holds directly on the wall)
 
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```bash
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+Under Consideration:
+- upgrade hold detection to yolov9
+- client side hold detection?
+- LED mode/client (most likely raspi + WS2812)
+- Moderation
+    - Shadowbans
+    - Automod for text
+    - Mod queue for images
