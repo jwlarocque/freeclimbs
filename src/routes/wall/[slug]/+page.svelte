@@ -1,4 +1,7 @@
 <script>
+	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import ConfirmModal from '$lib/ConfirmModal.svelte';
 	import EditWall from '$lib/EditWall.svelte';
     import LoadingEllipsis from '$lib/LoadingEllipsis.svelte';
@@ -8,13 +11,12 @@
 	import RouteViewer from '$lib/RouteViewer.svelte';
 	import SetList from '$lib/SetList.svelte';
 	import ChevronDownIcon from '$lib/icons/ChevronDownIcon.svelte';
-    import { pb, authStore } from '$lib/pocketbase.ts';
+    import { pb, authStore, loadSet, loadRoute } from '$lib/pocketbase.ts';
     import { Tabs } from 'bits-ui';
 
     export let data;
 
     let imageUrl;
-    let doLoadwall = loadWall();
     let showControls = true;
     let selectedSet;
     let lastSelectedSet;
@@ -22,6 +24,7 @@
     let creatingRoute = false;
     let newHoldType = "holds";
     const holdsTypes = ["start", "finish", "holds"];
+    let doLoadwall = loadWall();
 
     function resetRoute() {
         selectedRoute = {
@@ -87,6 +90,17 @@
         lastSelectedSet = selectedSet;
         selectedRoute = null;
         creatingRoute = false;
+        if (selectedSet.id != $page.url.searchParams.get("set")) {
+            goto(`?set=${selectedSet.id}`);
+        }
+    }
+
+    $: if (selectedRoute) {
+        if (selectedRoute.id) {
+            goto(`?set=${selectedSet.id}&route=${selectedRoute.id}`);
+        } else {
+            goto(`?set=${selectedSet.id}`);
+        }
     }
 
     async function loadWall() {
@@ -97,7 +111,14 @@
         if (record && record?.expand?.current_set) {
             imageUrl = `/api/files/${record.expand.current_set.collectionId}/${record.expand.current_set.id}/${record.expand.current_set.image}`;
         }
-        selectedSet = record?.expand?.current_set;
+        if ($page.url.searchParams.get("set")) {
+            selectedSet = await loadSet($page.url.searchParams.get("set"));
+        } else {
+            selectedSet = record?.expand?.current_set;
+        }
+        if ($page.url.searchParams.get("route")) {
+            selectedRoute = await loadRoute($page.url.searchParams.get("route"));
+        }
         return record;
     }
 </script>
@@ -180,6 +201,12 @@
         width: 20em;
         max-height: 100%;
         min-height: 0;
+    }
+
+    .error {
+        width: 100%;
+        margin: 1em auto;
+        text-align: center;
     }
 
     h3 {
@@ -289,13 +316,10 @@
                 />
             </div>
     {:catch error}
-        <!-- TODO: check that this still works -->
-        <header>
-            <h3>Error:</h3>
-        </header>
-        <div id="content">
+        <div id="content" class="error">
+            <h3>Error: {error.status}</h3>
             {#if error.status == 404}
-                <p>Wall not found. This wall may not exist or you may not have permission to view it.</p>
+                <p>Wall, set, or route not found. This content may not exist or you may not have permission to view it.</p>
             {:else}
                 <p>{error.message}</p>
                 <p>{error.originalError}</p>
