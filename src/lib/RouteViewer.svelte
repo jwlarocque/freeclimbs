@@ -147,6 +147,7 @@
         top: 0;
         left: 0;
         overflow: visible;
+        height: 100%;
     }
 
     #viewer {
