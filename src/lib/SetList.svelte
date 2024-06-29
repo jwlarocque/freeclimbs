@@ -31,16 +31,17 @@
         const records = await pb.collection("sets").getList(
             page, PAGE_SIZE, {
                 sort: "-draft,-created",
-                filter: `wall = "${wall.id}"`
+                filter: `(wall = "${wall.id}" && id != "${wall.expand.current_set.id}")`
             }
         );
         totalItems = records.totalItems;
-        // if wall.expand.current_set is in the list, set it to the first
+        // add the current set to the top of the list
+        // TODO: kinda weird
         let tempSets = records?.items;
         if (wall.expand.current_set.id) {
-            tempSets = tempSets.filter((set) => set.id != wall.expand.current_set.id);
             tempSets.unshift(wall.expand.current_set);
         }
+        console.log(tempSets);
         pagesSets[page] = tempSets;
         return tempSets;
     }
@@ -66,13 +67,14 @@
 <style>
     /* TODO: switch to grid layout so set buttons are in line */
     main {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 100px 1.5fr 1fr 1fr;
         gap: 5px;
     }
 
     .newSetButton {
         text-decoration: none;
+        grid-column: span 4;
     }
 
     .newSetButton button {
@@ -80,22 +82,29 @@
     }
 
     .set {
-        display: flex;
-        flex-direction: row;
+        display: grid;
+        grid-template-columns: subgrid;
+        grid-column: span 4;
         align-items: center;
         justify-content: space-between;
         gap: 1em;
         position: relative;
         cursor: pointer;
         border-radius: var(--primary-radius);
-        padding: 0 1em;
+        padding: 0 1em 0 0;
         transition: background-color 0.1s ease-in-out, transform 0.1s ease-in-out;
         border: 1px solid transparent;
+        overflow: hidden;
     }
 
     /* TODO: better selected and hover styling */
     .set.selected, .set:hover {
         background-color: var(--color-hover-background);
+    }
+
+    .set img {
+        max-height: 100%;
+        object-fit: contain;
     }
 
     /* .set.default {
@@ -112,6 +121,7 @@
     }
 
     :global(.paginav) {
+        grid-column: span 4;
         display: flex;
         flex-direction: row;
         justify-content: center;
@@ -161,6 +171,7 @@
                 tabindex="0"
             >
                 <!-- TODO: consider loading thumbnail images -->
+                <img src={`/api/files/${set.collectionId}/${set.id}/${set.image}?thumb=100x100`} />
                 <div>
                     <p>{set.name}</p>
                     <p class="minor">{(new Date(Date.parse(set.created))).toLocaleDateString()}</p>
@@ -172,6 +183,8 @@
                         <button class="buttonDarkTwo" on:click={() => updateDefaultSet(set.id)}>
                             Make Default
                         </button>
+                    {:else}
+                        <span></span>
                     {/if}
                     <!-- TODO: onConfirm and onCancel -->
                     <ConfirmModal buttonText="Delete" buttonClass="buttonDeleteInverse" title="Confirm Deletion">
