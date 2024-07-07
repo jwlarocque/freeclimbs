@@ -186,7 +186,12 @@
                 <!-- TODO: consider loading thumbnail images -->
                 <img src={`/api/files/${set.collectionId}/${set.id}/${set.image}?thumb=100x100`} alt=""/>
                 <div>
-                    <p>{set.name}</p>
+                    <p>
+                        {#if set.draft}
+                            <span class="minor">Draft:</span>
+                        {/if}
+                        {set.name}
+                    </p>
                     <p class="minor">{(new Date(Date.parse(set.created))).toLocaleDateString()}</p>
                 </div>
                 <!-- TODO: if owner, option to make current -->

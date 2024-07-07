@@ -1,7 +1,5 @@
 <script lang="ts">
-    import { fly } from "svelte/transition";
     import { loadSet, pb } from "$lib/pocketbase";
-    import { DropdownMenu } from "bits-ui";
 	import type { Hold } from "$lib/Hold";
     import LoadingEllipsis from "$lib/LoadingEllipsis.svelte";
 	import SetEditor from "$lib/SetEditor.svelte";
@@ -11,6 +9,7 @@
 
     export let data;
 
+    let demo:boolean = data.slug == "demo";
     let editorState;
     let showInfo = false;
     let holds:Hold[];
@@ -184,7 +183,7 @@
             <!-- TODO: we might need some more disable conditions here -->
             <button
                 on:click={() => saveSet(true)}
-                class={saving || publishing ? "buttonDark disabled" : "buttonDark"}
+                class={saving || publishing || demo ? "buttonDark disabled" : "buttonDark"}
             >
                 {#if saving}
                     Saving<LoadingEllipsis active={true}/>
@@ -194,7 +193,7 @@
             </button>
             <button
                 on:click={() => saveSet(false)}
-                class={saving || publishing ? "buttonDark disabled" : "buttonDark"}
+                class={saving || publishing || demo ? "buttonDark disabled" : "buttonDark"}
             >
                 {#if publishing}
                     Publishing<LoadingEllipsis active={true}/>
