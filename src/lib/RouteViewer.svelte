@@ -15,6 +15,8 @@
     export let panzoomEnabled = true;
     export let onClick = () => {};
 
+    const CANVAS_SIZE = 2048; // limit canvas size for performance
+
     // TODO: reorganize variables and reactivity
     let lastSet;
     let imageUrl;
@@ -64,8 +66,11 @@
     }
 
     function drawSet(holds, canv) {
-        canv.width = setImg.width;
-        canv.height = setImg.height;
+        let scale = Math.min(
+            CANVAS_SIZE / setImg.naturalWidth,
+            CANVAS_SIZE / setImg.naturalHeight);
+        canv.width = setImg.width * scale;
+        canv.height = setImg.height * scale;
         const ctx = canv.getContext("2d");
         ctx.clearRect(0, 0, canv.width, canv.height);
         ctx.beginPath();
@@ -82,16 +87,16 @@
             if (hold.contours) {
                 for (let j = 0; j < hold.contours.length; j++) {
                     const contourPoly = hold.contours[j];
-                    ctx.moveTo(contourPoly[0], contourPoly[1]);
+                    ctx.moveTo(contourPoly[0] * scale, contourPoly[1] * scale);
                     for (let k = 2; k < contourPoly.length; k += 2) {
-                        ctx.lineTo(contourPoly[k], contourPoly[k + 1]);
+                        ctx.lineTo(contourPoly[k] * scale, contourPoly[k + 1] * scale);
                     }
-                    ctx.lineTo(contourPoly[0], contourPoly[1]);
+                    ctx.lineTo(contourPoly[0] * scale, contourPoly[1] * scale);
                 }
             }
         }
         ctx.clip();
-        ctx.drawImage(setImg, 0, 0);
+        ctx.drawImage(setImg, 0, 0, canv.width, canv.height);
         ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
         ctx.fillRect(0, 0, canv.width, canv.height);
         ctx.strokeStyle = "blue";
@@ -119,9 +124,9 @@
                     ctx.shadowBlur = 15;
                     ctx.shadowColor = ctx.strokeStyle;
                     const contourPoly = hold.contours[j];
-                    ctx.moveTo(contourPoly[0], contourPoly[1]);
+                    ctx.moveTo(contourPoly[0] * scale, contourPoly[1] * scale);
                     for (let k = 2; k < contourPoly.length; k += 2) {
-                        ctx.lineTo(contourPoly[k], contourPoly[k + 1]);
+                        ctx.lineTo(contourPoly[k] * scale, contourPoly[k + 1] * scale);
                     }
                     ctx.closePath();
                     ctx.stroke();
