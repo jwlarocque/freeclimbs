@@ -1,22 +1,28 @@
 <script lang="ts">
     import { fly } from "svelte/transition";
-    import { pb } from "$lib/pocketbase";
+    import { loadSet, pb } from "$lib/pocketbase";
     import { DropdownMenu } from "bits-ui";
 	import type { Hold } from "$lib/Hold";
     import LoadingEllipsis from "$lib/LoadingEllipsis.svelte";
 	import SetEditor from "$lib/SetEditor.svelte";
     import TextInput from "$lib/TextInput.svelte";
+	import { page } from "$app/stores";
+	import { onMount } from "svelte";
 
     export let data;
 
     let editorState;
     let showInfo = false;
     let holds:Hold[];
-    let setImgUrl:FileList;
+    let setImgUrl:FileList|string; // TODO: fix type
     let setName = "";
     let setId;
     let saving = false;
     let publishing = false;
+
+    onMount(() => {
+        loadExistingSet();
+    });
 
     async function fileFromUrl(url) {
         if (!url) {
@@ -25,6 +31,21 @@
         const response = await fetch(url);
         const blob = await response.blob();
         return new File([blob], url.split("/").pop(), {type: blob.type});
+    }
+
+    async function loadExistingSet() {
+        let set;
+        if (!$page.url.searchParams.get("set")) {
+            return;
+        }
+        set = await loadSet($page.url.searchParams.get("set"));
+        if (set) {
+            setName = set.name;
+            setId = set.id;
+            console.log(set.image);
+            holds = set.holds;
+            setImgUrl = `/api/files/${set.collectionId}/${set.id}/${set.image}`;
+        }
     }
 
     async function saveSet(draft=true) {
@@ -46,13 +67,12 @@
             } else {
                 await pb.collection("sets").update(setId, {
                     "name": setName,
-                    "image": await fileFromUrl(setImgUrl),
                     "holds": holds,
                     "draft": draft
                 });
             }
             if (!draft) {
-                window.location.href = `/wall/${data.slug}/set/${setId}`;
+                window.location.href = `/wall/${data.slug}?set=${setId}`; 
             }
         } catch (error) {
             // TODO: nicer error
@@ -150,12 +170,18 @@
     }
 </style>
 
+<svelte:head>
+    <title>
+        Freeclimbs | Edit Set
+    </title>
+</svelte:head>
 <main class="sign">
     {#if true || editorState == "done"}
         <div id="controls">
             <div id="nameInput">
                 <TextInput bind:value={setName} placeholder={"Set Name"} />
             </div>
+            <!-- TODO: we might need some more disable conditions here -->
             <button
                 on:click={() => saveSet(true)}
                 class={saving || publishing ? "buttonDark disabled" : "buttonDark"}

@@ -6,6 +6,7 @@
 	import ConfirmModal from "./ConfirmModal.svelte";
 	import PrevIcon from "./icons/PrevIcon.svelte";
 	import NextIcon from "./icons/NextIcon.svelte";
+	import { goto } from "$app/navigation";
 
     export let isOwner = false;
     export let wall;
@@ -58,9 +59,13 @@
     // TODO: error and loading
     async function deleteSet(setId) {
         await pb.collection("sets").delete(setId);
+        if (selectedSet.id == setId) {
+            selectedSet = null;
+        }
+        pagesSets = {};
         currPage = 1;
         sets = await loadSets(currPage);
-        // TODO: close modal and reload Sets
+        goto(`?`)
     }
 </script>
 
@@ -70,6 +75,14 @@
         display: grid;
         grid-template-columns: 100px 1.5fr 1fr 1fr;
         gap: 5px;
+    }
+
+    a > button {
+        width: 100%;
+    }
+
+    a {
+        text-decoration: none;
     }
 
     .newSetButton {
@@ -149,7 +162,7 @@
 
 <main>
     {#if isOwner}
-        <a href={`/wall/${wall.id}/new-set`} class="newSetButton">
+        <a href={`/wall/${wall.id}/edit-set`} class="newSetButton">
             <!-- TODO: better styling -->
             <button class="buttonDarkInverse">
                 <p>New Set</p>
@@ -171,7 +184,7 @@
                 tabindex="0"
             >
                 <!-- TODO: consider loading thumbnail images -->
-                <img src={`/api/files/${set.collectionId}/${set.id}/${set.image}?thumb=100x100`} />
+                <img src={`/api/files/${set.collectionId}/${set.id}/${set.image}?thumb=100x100`} alt=""/>
                 <div>
                     <p>{set.name}</p>
                     <p class="minor">{(new Date(Date.parse(set.created))).toLocaleDateString()}</p>
@@ -179,7 +192,14 @@
                 <!-- TODO: if owner, option to make current -->
                 <!-- TODO: if permissions (?), option to delete -->
                 {#if isOwner}
-                    {#if wall.expand.current_set.id != set.id}
+                    {#if set.draft}
+                        <a href={`/wall/${wall.id}/edit-set?set=${set.id}`}>
+                            <!-- TODO: better styling -->
+                            <button class="buttonDarkTwo">
+                                <p>Edit Set</p>
+                            </button>
+                        </a>
+                    {:else if wall.expand.current_set.id != set.id}
                         <button class="buttonDarkTwo" on:click={() => updateDefaultSet(set.id)}>
                             Make Default
                         </button>

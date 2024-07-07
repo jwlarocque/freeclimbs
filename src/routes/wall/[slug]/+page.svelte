@@ -25,6 +25,11 @@
     let newHoldType = "holds";
     const holdsTypes = ["start", "finish", "holds"];
     let doLoadwall = loadWall();
+    let wallName = "Loading...";
+
+    $: pageTitle = "Freeclimbs | " + wallName + (
+        selectedSet ? " - " + selectedSet.name + (
+            selectedRoute ? " - " + selectedRoute.name : "") : "");
 
     function resetRoute() {
         selectedRoute = {
@@ -119,6 +124,7 @@
         if ($page.url.searchParams.get("route")) {
             selectedRoute = await loadRoute($page.url.searchParams.get("route"));
         }
+        wallName = record?.name;
         return record;
     }
 </script>
@@ -254,6 +260,11 @@
     }
 </style>
 
+<svelte:head>
+    <title>
+        {pageTitle}
+    </title>
+</svelte:head>
 <main class="sign">
     {#await doLoadwall}
         <!-- TODO: check that this still works -->

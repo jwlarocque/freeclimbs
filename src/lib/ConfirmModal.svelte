@@ -42,7 +42,9 @@
             </header>
             <slot name="message"/>
             <footer>
-                <slot name="confirm"/>
+                <Dialog.Close>
+                    <slot name="confirm"/>
+                </Dialog.Close>
             </footer>
         </Dialog.Content>
     </Dialog.Portal>

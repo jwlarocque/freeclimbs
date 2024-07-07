@@ -18,7 +18,7 @@
     $: if (autoState == "init" && wallImgURL) {
         autoState = "processing";
     }
-    $: if (autoState == "processing" && numHoldsSegmented >= holds.length) {
+    $: if (autoState == "processing" && samHandlerWorkersEmbedded.every((x) => x == "done") && numHoldsSegmented >= holds.length) {
         autoState = "done";
     }
 
@@ -140,7 +140,7 @@
             // use at least 1 worker
             // use no more than 1 worker per 2GB of memory
             // don't use more than 4 workers
-            const memoryWorkerLimit = Math.max(1, Math.floor(Math.min(navigator?.deviceMemory || 2, 8) / 2));
+            const memoryWorkerLimit = Math.max(1, Math.floor(Math.min(navigator?.deviceMemory || 4, 8) / 4));
             let numWorkers = Math.min(Math.max(navigator.hardwareConcurrency - 1, 1), memoryWorkerLimit);
             for (let i = 0; i < numWorkers; i++) {
                 let worker = new SamWorker();
@@ -152,9 +152,11 @@
                     } else if (type === 'segment_result') {
                         if (data == "start") {
                             this.workersEmbedded[i] = "running";
+                            this.workersEmbedded = this.workersEmbedded;
                             samHandlerWorkersEmbedded[i] = "running";
                         } else if (data == "done") {
                             this.workersEmbedded[i] = "done";
+                            this.workersEmbedded = this.workersEmbedded;
                             samHandlerWorkersEmbedded[i] = "done";
                             this.decodeFromQueue(i);
                         }
@@ -167,11 +169,7 @@
                             holds[hold_i].contours = contours;
                             // reactivity workaround, not sure why this is necessary
                             selectedHoldi = selectedHoldi;
-                            if (holds.every((hold) => hold.contours)) {
-                                allHoldsContoured = true;
-                                this.cullWorkers();
-                                // TODO: allow pointer events on the UI (also disallow when started)
-                            }
+                            this.checkHoldsContoured();
                         }
                         this.decodeFromQueue(i);
                     }
@@ -182,6 +180,16 @@
                 this.workersEmbedded.push("not_started");
                 samHandlerWorkersEmbedded.push("not_started");
             }
+        }
+
+        checkHoldsContoured() {
+            if (holds && holds.every((hold) => hold?.contours)) {
+                allHoldsContoured = true;
+                this.cullWorkers();
+                // TODO: allow pointer events on the UI (also disallow when started)
+                return true;
+            }
+            return false;
         }
 
         decodeFromQueue(worker_i) {
@@ -207,6 +215,7 @@
         // for simplicity, just have each worker compute their own embeddings
         // TODO: consider computing embeddings once and passing them to all workers
         segment(imgURL) {
+            this.checkHoldsContoured();
             this.workers.forEach((worker, i) => {
                 if (this.workersEmbedded[i] == "not_started") {
                     worker.postMessage({
@@ -237,6 +246,8 @@
         cullWorkers() {
             for (let i = 1; i < this.workers.length; i++) {
                 this.workers[i].terminate();
+                samHandlerWorkersEmbedded.splice(i, 1);
+                samHandlerWorkersReady.splice(i, 1);
             }
             this.workers = [this.workers[0]];
             this.workersReady = [this.workersReady[0]];
@@ -693,15 +704,15 @@
             </div>
         </div>
         {#if samHandler && holds}
-            {#if samHandler?.workers?.length != null && !holds.every((hold) => hold.contours)}
+            {#if samHandler?.workers?.length != null && (!samHandlerWorkersEmbedded.every((x) => x == "done") || !holds.every((hold) => hold.contours))}
                 <div id="processStatus" class="infoBox" transition:fly={{x: 50}}>
                     <p>
                         <span>Creating workers<LoadingEllipsis active={numWorkersReady < samHandler.workers.length}/> </span>
-                        <span>{numWorkersReady} / {samHandler.workers.length}</span>
+                        <span>{numWorkersReady} / {samHandlerWorkersReady.length}</span>
                     </p>
                     <p>
                         <span>Encoding image<LoadingEllipsis active={(numWorkersReady > 0) && (numWorkersEmbedded < samHandler.workers.length)}/> </span>
-                        <span>{numWorkersEmbedded} / {samHandler.workers.length}</span>
+                        <span>{numWorkersEmbedded} / {samHandlerWorkersEmbedded.length}</span>
                     </p>
                     <p>
                         <span>Segmenting holds<LoadingEllipsis active={numWorkersEmbedded > 0 && numHoldsSegmented < holds.length}/> </span>
