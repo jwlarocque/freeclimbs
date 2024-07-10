@@ -27,7 +27,7 @@
         {value: "1 = 1", label: "All"},
         {value: "draft = True", label: "Draft"},
         {value: "draft = False", label: "Not Draft"},
-        {value: "setter = '" + $authStore.model.id + "'", label: "My Routes"},
+        {value: "setter = '" + $authStore.model?.id + "'", label: "My Routes"},
         {value: "created >= '" + daysAgo(7) + "'", label: "New This Week"}, // TODO: evalute at query time
     ];
 

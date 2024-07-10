@@ -43,8 +43,8 @@
 <nav>
     <a href="/"><h1>Freeclimbs</h1></a>
     <div>
-        <NewWall isNew={true}/>
         {#if $authStore.isValid}
+            <NewWall isNew={true}/>
             <button class="buttonLight" on:click={logout}><p>Log Out</p></button>
         {:else}
             <LoginModal/>

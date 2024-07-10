@@ -325,7 +325,10 @@
                                 <br/>
                                 <RouteList set={selectedSet} bind:selectedRoute bind:creatingRoute/>
                                 <!-- TODO: this button needs to go somewhere else -->
-                                <button class="buttonDarkInverse" id="newRoute" on:click={() => {creatingRoute = true; resetRoute();}}>New Route</button>
+                                <!-- TODO: auth check for more complex authorization setups -->
+                                {#if $authStore.model?.id}
+                                    <button class="buttonDarkInverse" id="newRoute" on:click={() => {creatingRoute = true; resetRoute();}}>New Route</button>
+                                {/if}
                             {/if}
                         </div>
                     </Tabs.Content>
