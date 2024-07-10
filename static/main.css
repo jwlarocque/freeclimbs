@@ -84,6 +84,15 @@ button, .buttonLight, .buttonDark, .buttonDarkInverse, .buttonDelete {
     background-color: var(--color-hover-background);
 }
 
+.buttonDarkTwo {
+    color: black;
+    background-color: transparent;
+}
+
+.buttonDarkTwo:hover {
+    background-color: var(--color-major);
+}
+
 .buttonDarkInverse {
     color: var(--color-major);
     background-color: var(--color-background);

@@ -124,15 +124,6 @@
         border: 1px solid var(--color-background);
     } */
 
-    .buttonDarkTwo {
-        color: black;
-        background-color: transparent;
-    }
-
-    .buttonDarkTwo:hover {
-        background-color: var(--color-major);
-    }
-
     :global(.paginav) {
         grid-column: span 4;
         display: flex;
