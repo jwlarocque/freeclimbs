@@ -21,6 +21,7 @@
     let selectedSet;
     let lastSelectedSet;
     let selectedRoute;
+    let lastSelectedRouteId;
     let creatingRoute = false;
     let newHoldType = "holds";
     const holdsTypes = ["start", "finish", "holds"];
@@ -100,7 +101,8 @@
         }
     }
 
-    $: if (selectedRoute) {
+    $: if (selectedRoute && lastSelectedRouteId != selectedRoute.id) {
+        lastSelectedRouteId = selectedRoute.id;
         if (selectedRoute.id) {
             goto(`?set=${selectedSet.id}&route=${selectedRoute.id}`);
         } else {
@@ -152,22 +154,28 @@
     }
 
     #toggleControls {
+        padding: 0.25em;
         position: absolute;
         right: 0;
         top: 50%;
         transform: translateY(-50%);
         margin: auto;
         visibility: hidden;
+        width: auto;
+    }
+
+    #toggleControls:not(:hover) {
+        background-color: var(--color-major);
     }
 
     :global(.controls) {
+        position: relative;
         flex: 1 1 20em;
         display: flex;
         flex-direction: column;
         gap: 5px;
         max-width: 40em;
         max-height: 100%;
-        overflow-y: auto;
     }
 
     :global(.tabs) {
@@ -193,10 +201,21 @@
         background-color: var(--color-hover-background);
     }
 
+    :global(.tabContainer) {
+        overflow-y: auto;
+        padding-bottom: 2em;
+    }
+
     :global(.tabPanel > div) {
         display: flex;
         flex-direction: column;
         gap: 5px;
+    }
+
+    #newRoute {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
     }
 
     #viewer {
@@ -232,9 +251,9 @@
             transition: transform 0.1s ease-in-out;
         }
 
-        #toggleControls.flipped {
+        /* :global(#toggleControls.flipped) {
             transform: translateY(-50%) rotate(180deg);
-        }
+        } */
 
         #viewer {
             width: 100%;
@@ -284,7 +303,7 @@
                         <ChevronDownIcon/>
                     </button>
                 </header>
-                <div class={showControls ? "" : "hiddenControls"}>
+                <div class={showControls ? "tabContainer" : "hiddenControls"}>
                     <Tabs.List class="tabs">
                         <Tabs.Trigger value="routes" class="buttonDark">Routes</Tabs.Trigger>
                         <Tabs.Trigger value="sets" class="buttonDark">Sets</Tabs.Trigger>
@@ -303,8 +322,10 @@
                                 <!-- TODO: too many bound props, awk -->
                                 <NewRoute selectedSet={selectedSet} bind:newHoldType bind:selectedRoute bind:creatingRoute/>
                             {:else}
-                                <button class="buttonDarkInverse" on:click={() => {creatingRoute = true; resetRoute();}}>New Route</button>
+                                <br/>
                                 <RouteList set={selectedSet} bind:selectedRoute bind:creatingRoute/>
+                                <!-- TODO: this button needs to go somewhere else -->
+                                <button class="buttonDarkInverse" id="newRoute" on:click={() => {creatingRoute = true; resetRoute();}}>New Route</button>
                             {/if}
                         </div>
                     </Tabs.Content>
