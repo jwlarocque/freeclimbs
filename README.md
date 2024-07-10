@@ -9,20 +9,18 @@ Launch:
     - Unify?
     - Buttons
 - Add Wall Select (home page)
-- Store current Set and Route as URL params
 - Sets
-    - Clone + Edit as new Set
+    - Clone Set as draft
     - Edit existing (draft) Sets
-    - Always show current Set at top of list
-    - Thumbnails (?)
 - Sharing links
     - QR codes
 - Sends, ratings, and climber grades
-- Filter and search Routes
+    - Additional route search filtering/sorting based on ratings
 - More auth options (Google at minimum)
-- Set Creation Demo for unauthed users
+    - Fix reload-on-login
 - User settings
     - Grading system (font/hueco/dankyu)
+    - Username/nickname
 - API rate limiting (just use nginx?)
 - Global admin settings (e.g. disallow Wall creation)
 - GDPR
@@ -30,12 +28,20 @@ Launch:
     - Don't load models from Hugging Face
 - Moderation
     - Banned users (readonly-ify on backend)
+- Bug fixes
+    - "Glint" freezes sometimes (looks fine in dev tools)
+    - Controls expand/collapse responsiveness
 
 Up Next:
 - More detailed new Set instructions (particularly for error correction step)
 - CI
-- Climbing rating aggregation (not just mean)
-- More login options (including username/password)
+- Climber rating aggregation (not just mean)
+    - https://www.evanmiller.org/ranking-items-with-star-ratings.html
+    - pocketbase extension for write-time aggregation
+- More login options
+    - Populate automatically from pocketbase available
+    - Username/password login (disabled in default config)
+- Better updates on navigation, store route search params in URL
 
 Planned:
 - Svelte 5
@@ -43,7 +49,7 @@ Planned:
 - Projector mode (use a projector to light holds directly on the wall)
 
 Under Consideration:
-- upgrade hold detection to yolov9
+- upgrade hold detection to yolov9 (https://github.com/WongKinYiu/YOLO/)
 - client side hold detection?
 - LED mode/client (most likely raspi + WS2812)
 - Moderation
