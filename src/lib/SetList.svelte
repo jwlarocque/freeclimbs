@@ -32,14 +32,14 @@
         const records = await pb.collection("sets").getList(
             page, PAGE_SIZE, {
                 sort: "-draft,-created",
-                filter: `(wall = "${wall.id}" && id != "${wall.expand.current_set.id}")`
+                filter: `(wall = "${wall.id}" && id != "${wall?.expand?.current_set?.id}")`
             }
         );
         totalItems = records.totalItems;
         // add the current set to the top of the list
         // TODO: kinda weird
         let tempSets = records?.items;
-        if (wall.expand.current_set.id) {
+        if (wall?.expand?.current_set?.id) {
             tempSets.unshift(wall.expand.current_set);
         }
         console.log(tempSets);

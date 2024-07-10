@@ -31,6 +31,7 @@ Launch:
 - Bug fixes
     - "Glint" freezes sometimes (looks fine in dev tools)
     - Controls expand/collapse responsiveness
+    - Empty set list has a page zero
 
 Up Next:
 - More detailed new Set instructions (particularly for error correction step)
