@@ -166,26 +166,6 @@
         visibility: hidden;
     }
 
-    #glint {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0.6;
-        background: linear-gradient(15deg, rgba(255,255,255,0) 45%, rgba(255,255,255,1) 50%, rgba(255,255,255,0) 55%);
-        animation: glint 3s linear infinite;
-    }
-
-    @keyframes glint {
-        0% {
-            transform: translate(0, 100%);
-        }
-        100% {
-            transform: translate(0, -100%);
-        }
-    }
-
     #loadingIndicator {
         position: absolute;
         top: 50%;
@@ -252,7 +232,6 @@
                 alt="the selected set for this climbing wall"
             />
         {/if}
-        <div id="glint"></div>
         <canvas bind:this={canvas}></canvas>
     </div>
     {#if setImgLoaded}
