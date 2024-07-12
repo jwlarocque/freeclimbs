@@ -255,7 +255,11 @@
         </div>
     {:else}
         <div id="loadingIndicator" class="sign">
-            <p>Loading Image<LoadingEllipsis active={true}/></p>
+            {#if set}
+                <p>Loading Image<LoadingEllipsis active={true}/></p>
+            {:else}
+                <p>Select or Create a Set</p>
+            {/if}
         </div>
     {/if}
 </div>

@@ -188,5 +188,8 @@ button p, .buttonLight p, .buttonDark p, .buttonDelete p {
 
 .disabled {
     pointer-events: none;
+}
+
+button.disabled {
     opacity: 0.6;
 }

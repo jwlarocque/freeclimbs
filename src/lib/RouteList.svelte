@@ -106,6 +106,7 @@
         await pb.collection("routes").delete(id);
         currPage = 1;
         routes = await loadRoutes(currPage);
+        routesStale = true;
     }
 
     function daysAgo(days) {

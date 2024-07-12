@@ -47,6 +47,7 @@
         }
     }
 
+    // TODO: set as wall's current_set? (only if none exists?)
     async function saveSet(draft=true) {
         if (draft) {
             saving = true;

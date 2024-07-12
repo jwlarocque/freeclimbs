@@ -5,6 +5,7 @@ Free and open source route book for home climbing and spray walls.
 ## Roadmap
 
 Launch:
+- Move controls toggle inline with tabs, hide wall name on mobile
 - Styling
     - Unify?
     - Buttons
@@ -29,9 +30,14 @@ Launch:
 - Moderation
     - Banned users (readonly-ify on backend)
 - Bug fixes
-    - "Glint" freezes sometimes (looks fine in dev tools)
     - Controls expand/collapse responsiveness
     - Empty set list has a page zero
+    - Login redirect is broken
+    - Weird bug when adding a hold to the editor on mobile?
+    - When first set is created, set as current_set? (only if none exists?)
+    - Are the certs working properly on birdthing?
+    - Check behavior when no walls exist
+    - Check routeviewer behavior when holds overlap
 
 Up Next:
 - More detailed new Set instructions (particularly for error correction step)

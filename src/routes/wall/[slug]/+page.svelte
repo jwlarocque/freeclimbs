@@ -326,7 +326,7 @@
                                 <RouteList set={selectedSet} bind:selectedRoute bind:creatingRoute/>
                                 <!-- TODO: this button needs to go somewhere else -->
                                 <!-- TODO: auth check for more complex authorization setups -->
-                                {#if $authStore.model?.id}
+                                {#if $authStore.isValid && selectedSet}
                                     <button class="buttonDarkInverse" id="newRoute" on:click={() => {creatingRoute = true; resetRoute();}}>New Route</button>
                                 {/if}
                             {/if}

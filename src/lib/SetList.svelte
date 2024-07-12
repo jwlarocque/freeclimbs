@@ -94,6 +94,11 @@
         width: 100%;
     }
 
+    .loading {
+        text-align: center;
+        grid-column: span 4;
+    }
+
     .set {
         display: grid;
         grid-template-columns: subgrid;
@@ -161,27 +166,26 @@
         </a>
     {/if}
     {#await sets}
-        <p>Loading sets<LoadingEllipsis active={true}/></p>
+        <p class="loading">Loading sets<LoadingEllipsis active={true}/></p>
     {:then setsCopy}
         <!-- TODO: if no sets, prompt to create one -->
         {#each setsCopy as set}
             <div
                 class={
-                    (selectedSet.id == set.id ? "set selected " : "set ")
-                    + (wall.expand.current_set.id == set.id ? "default" : "")}
+                    (selectedSet?.id == set.id ? "set selected " : "set ")
+                    + (wall?.expand?.current_set?.id == set.id ? "default" : "")}
                 on:click={() => selectedSet = set}
                 on:keydown={() => selectedSet = set}
                 role="button"
                 tabindex="0"
             >
-                <!-- TODO: consider loading thumbnail images -->
                 <img src={`/api/files/${set.collectionId}/${set.id}/${set.image}?thumb=100x100`} alt=""/>
                 <div>
                     <p>
                         {#if set.draft}
                             <span class="minor">Draft:</span>
                         {/if}
-                        {set.name}
+                        {set.name || "Unnamed"}
                     </p>
                     <p class="minor">{(new Date(Date.parse(set.created))).toLocaleDateString()}</p>
                 </div>
@@ -195,7 +199,7 @@
                                 <p>Edit Set</p>
                             </button>
                         </a>
-                    {:else if wall.expand.current_set.id != set.id}
+                    {:else if wall?.expand?.current_set?.id != set.id}
                         <button class="buttonDarkTwo" on:click={() => updateDefaultSet(set.id)}>
                             Make Default
                         </button>
@@ -213,28 +217,30 @@
                 {/if}
             </div>
         {/each}
-        <Pagination.Root
-            class="paginav"
-            count={totalItems}
-            perPage={PAGE_SIZE}
-            let:pages
-            let:range
-            bind:page={currPage}
-        >
-            <!-- TODO: disable prev and next buttons when no additional pages -->
-            <Pagination.PrevButton class="buttonDark paginationButton">
-                <PrevIcon/>
-            </Pagination.PrevButton>
-            {#each pages as page (page.key)}
-                {#if page.type == "ellipsis"}
-                    ...
-                {:else}
-                    <Pagination.Page  class={page.value == currPage ? "buttonDark paginationButton current" : "buttonDark paginationButton"} {page}/>
-                {/if}
-            {/each}
-            <Pagination.NextButton class="buttonDark paginationButton">
-                <NextIcon/>
-            </Pagination.NextButton>
-        </Pagination.Root>
+        {#if setsCopy.length > 0}
+            <Pagination.Root
+                class="paginav"
+                count={totalItems}
+                perPage={PAGE_SIZE}
+                let:pages
+                let:range
+                bind:page={currPage}
+            >
+                <!-- TODO: disable prev and next buttons when no additional pages -->
+                <Pagination.PrevButton class="buttonDark paginationButton">
+                    <PrevIcon/>
+                </Pagination.PrevButton>
+                {#each pages as page (page.key)}
+                    {#if page.type == "ellipsis"}
+                        ...
+                    {:else}
+                        <Pagination.Page  class={page.value == currPage ? "buttonDark paginationButton current" : "buttonDark paginationButton"} {page}/>
+                    {/if}
+                {/each}
+                <Pagination.NextButton class="buttonDark paginationButton">
+                    <NextIcon/>
+                </Pagination.NextButton>
+            </Pagination.Root>
+        {/if}
     {/await}
 </main>
