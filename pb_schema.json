@@ -1,0 +1,478 @@
+[
+  {
+    "id": "_pb_users_auth_",
+    "name": "users",
+    "type": "auth",
+    "system": false,
+    "schema": [
+      {
+        "system": false,
+        "id": "users_name",
+        "name": "name",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": null,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "users_avatar",
+        "name": "avatar",
+        "type": "file",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "mimeTypes": [
+            "image/jpeg",
+            "image/png",
+            "image/svg+xml",
+            "image/gif",
+            "image/webp"
+          ],
+          "thumbs": null,
+          "maxSelect": 1,
+          "maxSize": 5242880,
+          "protected": false
+        }
+      }
+    ],
+    "indexes": [],
+    "listRule": "id = @request.auth.id",
+    "viewRule": "id = @request.auth.id",
+    "createRule": "",
+    "updateRule": "id = @request.auth.id",
+    "deleteRule": "id = @request.auth.id",
+    "options": {
+      "allowEmailAuth": true,
+      "allowOAuth2Auth": true,
+      "allowUsernameAuth": true,
+      "exceptEmailDomains": null,
+      "manageRule": null,
+      "minPasswordLength": 8,
+      "onlyEmailDomains": null,
+      "onlyVerified": false,
+      "requireEmail": false
+    }
+  },
+  {
+    "id": "4vhzmblhix7j4sp",
+    "name": "routes",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "system": false,
+        "id": "h4hgwioo",
+        "name": "set",
+        "type": "relation",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "m3tsbvk1sagsj6d",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      },
+      {
+        "system": false,
+        "id": "prnxrrc6",
+        "name": "setter",
+        "type": "relation",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "_pb_users_auth_",
+          "cascadeDelete": false,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      },
+      {
+        "system": false,
+        "id": "wjnxbsma",
+        "name": "name",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": null,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "qhro1s7i",
+        "name": "setter_grade",
+        "type": "number",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": 29,
+          "noDecimal": true
+        }
+      },
+      {
+        "system": false,
+        "id": "8utjrugl",
+        "name": "free_feet",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      },
+      {
+        "system": false,
+        "id": "hscoziti",
+        "name": "top_out",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      },
+      {
+        "system": false,
+        "id": "yo607gyr",
+        "name": "holds",
+        "type": "json",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSize": 20000
+        }
+      },
+      {
+        "system": false,
+        "id": "sq0pf4ka",
+        "name": "draft",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      }
+    ],
+    "indexes": [],
+    "listRule": "// public wall and not draft\n(set.wall.public = true && draft = false)\n// or requestor is wall owner\n|| set.wall.owner = @request.auth.id",
+    "viewRule": "// public wall and not draft\n(set.wall.public = true && draft = false)\n// or requestor is wall owner\n|| set.wall.owner = @request.auth.id",
+    "createRule": "// must be authenticated\n@request.auth.id != \"\"\n// must have self as setter\n&& @request.auth.id = setter\n// set must not be a draft\n&& set.draft = false\n&& (\n  // public wall\n  set.wall.public = true\n  // on private walls only wall owner can create routes (for now)\n  || set.wall.owner = @request.auth.id\n)",
+    "updateRule": "// only drafts can be updated, and only by the setter\ndraft = true && setter = @request.auth.id\n// the setter cannot be changed\n&& (@request.auth.id = @request.data.setter || @request.data.setter = null)",
+    "deleteRule": "// wall owner and setter can delete\nset.wall.owner = @request.auth.id || setter = @request.auth.id",
+    "options": {}
+  },
+  {
+    "id": "f6jigd74au4q3h7",
+    "name": "sends",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "system": false,
+        "id": "74v8ld8g",
+        "name": "user",
+        "type": "relation",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "_pb_users_auth_",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      },
+      {
+        "system": false,
+        "id": "vxkywzdb",
+        "name": "route",
+        "type": "relation",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "4vhzmblhix7j4sp",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      },
+      {
+        "system": false,
+        "id": "8bapefqt",
+        "name": "sent",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      },
+      {
+        "system": false,
+        "id": "9t44f890",
+        "name": "rating",
+        "type": "number",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": 5,
+          "noDecimal": true
+        }
+      },
+      {
+        "system": false,
+        "id": "trp4ufzk",
+        "name": "grade",
+        "type": "number",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 0,
+          "max": 29,
+          "noDecimal": true
+        }
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_7EqVC4z` ON `sends` (\n  `user`,\n  `route`\n)"
+    ],
+    "listRule": null,
+    "viewRule": null,
+    "createRule": null,
+    "updateRule": null,
+    "deleteRule": null,
+    "options": {}
+  },
+  {
+    "id": "m3tsbvk1sagsj6d",
+    "name": "sets",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "system": false,
+        "id": "6cozjszt",
+        "name": "wall",
+        "type": "relation",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "kjawuuqzdbtv09k",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      },
+      {
+        "system": false,
+        "id": "2twuuu2o",
+        "name": "name",
+        "type": "text",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": null,
+          "max": 512,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "r3svnxyp",
+        "name": "image",
+        "type": "file",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "mimeTypes": [
+            "image/png",
+            "image/vnd.mozilla.apng",
+            "image/jpeg",
+            "image/webp",
+            "image/tiff"
+          ],
+          "thumbs": [],
+          "maxSelect": 1,
+          "maxSize": 5242880,
+          "protected": false
+        }
+      },
+      {
+        "system": false,
+        "id": "p1zrjoro",
+        "name": "holds",
+        "type": "json",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSize": 2000000
+        }
+      },
+      {
+        "system": false,
+        "id": "zdn6te3j",
+        "name": "draft",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      }
+    ],
+    "indexes": [],
+    "listRule": "// public wall, not a draft\n(wall.public = true && draft = false)\n// or requestor is wall owner\n|| wall.owner = @request.auth.id",
+    "viewRule": "// public wall, not a draft\n(wall.public = true && draft = false)\n// or requestor is wall owner\n|| wall.owner = @request.auth.id",
+    "createRule": "// only wall owner can create sets (for now)\nwall.owner = @request.auth.id",
+    "updateRule": "// only wall owner can update sets, and only if the set is a draft\ndraft = true && wall.owner = @request.auth.id",
+    "deleteRule": "// only wall owner can delete sets (for now)\nwall.owner = @request.auth.id",
+    "options": {}
+  },
+  {
+    "id": "8ykxo2f4kvy7mom",
+    "name": "shares",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "system": false,
+        "id": "dfj0fplk",
+        "name": "wall",
+        "type": "relation",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "kjawuuqzdbtv09k",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      },
+      {
+        "system": false,
+        "id": "lom6jna5",
+        "name": "editing",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      }
+    ],
+    "indexes": [],
+    "listRule": null,
+    "viewRule": null,
+    "createRule": null,
+    "updateRule": null,
+    "deleteRule": null,
+    "options": {}
+  },
+  {
+    "id": "kjawuuqzdbtv09k",
+    "name": "walls",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "system": false,
+        "id": "dbdgujdd",
+        "name": "name",
+        "type": "text",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": 1,
+          "max": 512,
+          "pattern": ""
+        }
+      },
+      {
+        "system": false,
+        "id": "fcj8khnt",
+        "name": "owner",
+        "type": "relation",
+        "required": true,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "_pb_users_auth_",
+          "cascadeDelete": false,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      },
+      {
+        "system": false,
+        "id": "ultexhrq",
+        "name": "public",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      },
+      {
+        "system": false,
+        "id": "efzp3sgk",
+        "name": "allow_training",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      },
+      {
+        "system": false,
+        "id": "hm1ferd1",
+        "name": "current_set",
+        "type": "relation",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "m3tsbvk1sagsj6d",
+          "cascadeDelete": false,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      }
+    ],
+    "indexes": [],
+    "listRule": "// public walls\npublic = true\n// or owner (for now)\n|| @request.auth.id = owner.id\n|| @request.headers.share_id = @collection.shares.id",
+    "viewRule": "// public walls\npublic = true\n// or owner (for now)\n|| @request.auth.id = owner.id",
+    "createRule": "// must be authenticated to create\n@request.auth.id != \"\"\n// only the creator can be the owner\n&& @request.auth.id = owner",
+    "updateRule": "// only the owner can update\n@request.auth.id = owner.id\n// the owner cannot be changed\n&& (@request.auth.id = @request.data.owner || @request.data.owner = null)",
+    "deleteRule": "// only the owner can delete\n@request.auth.id = owner.id",
+    "options": {}
+  }
+]
