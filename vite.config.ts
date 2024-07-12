@@ -7,8 +7,8 @@ export default defineConfig({
 		proxy: {
 			"/detect": {
 				target: "http://127.0.0.1:8000/",
-				changeOrigin: true,
-				rewrite: (path) => path.replace("/detect", "")
+				// changeOrigin: true,
+				// rewrite: (path) => path.replace("/detect", "")
 			},
 			"/api": {
 				target: "http://127.0.0.1:8090/",

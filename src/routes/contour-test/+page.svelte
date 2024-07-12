@@ -143,6 +143,6 @@
 <button on:click={getMaskData}>Get Mask Data</button>
 <button on:click={render}>Render</button>
 <div id="segmentation">
-    <img src="hold_mask_3.png" bind:this={imgElement}/>
+    <!-- <img src="hold_mask_3.png" bind:this={imgElement}/> -->
     <canvas bind:this={canvas}></canvas>
 </div>
