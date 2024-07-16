@@ -170,9 +170,9 @@
       }
     ],
     "indexes": [],
-    "listRule": "// public wall and not draft\n(set.wall.public = true && draft = false)\n// or requestor is wall owner\n|| set.wall.owner = @request.auth.id",
-    "viewRule": "// public wall and not draft\n(set.wall.public = true && draft = false)\n// or requestor is wall owner\n|| set.wall.owner = @request.auth.id",
-    "createRule": "// must be authenticated\n@request.auth.id != \"\"\n// must have self as setter\n&& @request.auth.id = setter\n// set must not be a draft\n&& set.draft = false\n&& (\n  // public wall\n  set.wall.public = true\n  // on private walls only wall owner can create routes (for now)\n  || set.wall.owner = @request.auth.id\n)",
+    "listRule": "// public wall and not draft\n(set.wall.public = true && draft = false)\n// or requestor is wall owner\n|| set.wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = id\n    && @collection.users_shares.banned = false)",
+    "viewRule": "// public wall and not draft\n(set.wall.public = true && draft = false)\n// or requestor is wall owner\n|| set.wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = id\n    && @collection.users_shares.banned = false)",
+    "createRule": "// must be authenticated\n@request.auth.id != \"\"\n// must have self as setter\n&& @request.auth.id = setter\n// set must not be a draft\n&& set.draft = false\n&& (\n  // public wall\n  set.wall.public = true\n  // or requestor is wall owner\n  || set.wall.owner = @request.auth.id\n  // or shared with editing privileges\n  || (draft = false\n      && @request.auth.id = @collection.users_shares.user.id\n      && @collection.users_shares.share.wall.id = set.wall.id\n      && @collection.users_shares.banned = false\n      && @collection.shares.id = @collection.users_shares.share.id\n      && @collection.shares.editing = true)\n)",
     "updateRule": "// only drafts can be updated, and only by the setter\ndraft = true && setter = @request.auth.id\n// the setter cannot be changed\n&& (@request.auth.id = @request.data.setter || @request.data.setter = null)",
     "deleteRule": "// wall owner and setter can delete\nset.wall.owner = @request.auth.id || setter = @request.auth.id",
     "options": {}
@@ -346,8 +346,8 @@
       }
     ],
     "indexes": [],
-    "listRule": "// public wall, not a draft\n(wall.public = true && draft = false)\n// or requestor is wall owner\n|| wall.owner = @request.auth.id",
-    "viewRule": "// public wall, not a draft\n(wall.public = true && draft = false)\n// or requestor is wall owner\n|| wall.owner = @request.auth.id",
+    "listRule": "// public wall, not a draft\n(wall.public = true && draft = false)\n// or requestor is wall owner\n|| wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = id\n    && @collection.users_shares.banned = false)",
+    "viewRule": "// public wall, not a draft\n(wall.public = true && draft = false)\n// or requestor is wall owner\n|| wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = id\n    && @collection.users_shares.banned = false)",
     "createRule": "// only wall owner can create sets (for now)\nwall.owner = @request.auth.id",
     "updateRule": "// only wall owner can update sets, and only if the set is a draft\ndraft = true && wall.owner = @request.auth.id",
     "deleteRule": "// only wall owner can delete sets (for now)\nwall.owner = @request.auth.id",
@@ -387,10 +387,82 @@
       }
     ],
     "indexes": [],
-    "listRule": null,
-    "viewRule": null,
-    "createRule": null,
-    "updateRule": null,
+    "listRule": "wall.owner = @request.auth.id",
+    "viewRule": "wall.owner = @request.auth.id",
+    "createRule": "wall.owner = @request.auth.id",
+    "updateRule": "wall.owner = @request.auth.id",
+    "deleteRule": "wall.owner = @request.auth.id",
+    "options": {}
+  },
+  {
+    "id": "cnc2ffzm7f4abgq",
+    "name": "users_shares",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "system": false,
+        "id": "xvkqeagj",
+        "name": "user",
+        "type": "relation",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "_pb_users_auth_",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      },
+      {
+        "system": false,
+        "id": "linavymh",
+        "name": "share",
+        "type": "relation",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "8ykxo2f4kvy7mom",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      },
+      {
+        "system": false,
+        "id": "x0y1besw",
+        "name": "banned",
+        "type": "bool",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {}
+      },
+      {
+        "system": false,
+        "id": "ewqstqhk",
+        "name": "last_accessed",
+        "type": "date",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "min": "",
+          "max": ""
+        }
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_Ji3jpq0` ON `users_shares` (\n  `user`,\n  `share`\n)"
+    ],
+    "listRule": "// only you\n@request.auth.id = user.id\n// and the wall owner\n|| @request.auth.id = share.wall.owner.id",
+    "viewRule": "// only you\n@request.auth.id = user.id\n// and the wall owner\n|| @request.auth.id = share.wall.owner.id",
+    "createRule": "// can only create shares with yourself, and only if you have the share id\n@request.query.share_id = share.id\n&& @request.auth.id = user.id\n&& banned = false // can't ban yourself",
+    "updateRule": "// only you (but you can't modify your ban status)\n(@request.auth.id = user.id && @request.data.banned = banned)\n// and the wall owner\n|| @request.auth.id = share.wall.owner.id",
     "deleteRule": null,
     "options": {}
   },
@@ -468,8 +540,8 @@
       }
     ],
     "indexes": [],
-    "listRule": "// public walls\npublic = true\n// or owner (for now)\n|| @request.auth.id = owner.id\n|| @request.headers.share_id = @collection.shares.id",
-    "viewRule": "// public walls\npublic = true\n// or owner (for now)\n|| @request.auth.id = owner.id",
+    "listRule": "// public walls\npublic = true\n// or owner\n|| @request.auth.id = owner.id\n// or shared\n|| (@request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = id\n    && @collection.users_shares.banned = false)",
+    "viewRule": "// public walls\npublic = true\n// or owner\n|| @request.auth.id = owner.id\n// or shared\n|| (@request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = id\n    && @collection.users_shares.banned = false)",
     "createRule": "// must be authenticated to create\n@request.auth.id != \"\"\n// only the creator can be the owner\n&& @request.auth.id = owner",
     "updateRule": "// only the owner can update\n@request.auth.id = owner.id\n// the owner cannot be changed\n&& (@request.auth.id = @request.data.owner || @request.data.owner = null)",
     "deleteRule": "// only the owner can delete\n@request.auth.id = owner.id",
