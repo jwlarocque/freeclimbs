@@ -670,6 +670,19 @@
                             on:touchend={handleResizeEnd}
                         ></rect>
                     {/each}
+                    <!-- draw preview first so in case of bug it's on bottom -->
+                    {#if bboxPreview}
+                        <rect
+                            width="{bboxPreview.right - bboxPreview.left}"
+                            height="{bboxPreview.bottom - bboxPreview.top}"
+                            fill="transparent"
+                            stroke="red"
+                            stroke-width="2"
+                            x="{bboxPreview.left}"
+                            y="{bboxPreview.top}"
+                            stroke-dasharray="4"
+                        ></rect>
+                    {/if}
                     {#if selectedHoldi != null && holds[selectedHoldi]}
                         {#each Object.keys(DIRS) as dir}
                             <!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -687,18 +700,6 @@
                                 on:touchstart={(e) => {startHoldResize(e, dir);}}
                             ></circle>
                         {/each}
-                    {/if}
-                    {#if bboxPreview}
-                        <rect
-                            width="{bboxPreview.right - bboxPreview.left}"
-                            height="{bboxPreview.bottom - bboxPreview.top}"
-                            fill="transparent"
-                            stroke="red"
-                            stroke-width="2"
-                            x="{bboxPreview.left}"
-                            y="{bboxPreview.top}"
-                            stroke-dasharray="4"
-                        ></rect>
                     {/if}
                 </svg>
             </div>
@@ -725,7 +726,7 @@
                         <DeleteIcon/>
                     </button>
                     <!-- svelte-ignore a11y-mouse-events-have-key-events -->
-                    <button on:click={addHold} on:mouseover={previewAddHold} on:mouseleave={() => bboxPreview = null} title="add hold">
+                    <button on:click={addHold} on:pointerover={previewAddHold} on:pointerleave={() => bboxPreview = null} title="add hold">
                         <AddHoldIcon/>
                     </button>
                     <button on:click={recenter} title="recenter">

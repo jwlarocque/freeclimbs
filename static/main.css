@@ -13,18 +13,11 @@
     --inset: 5px;
 }
 
-h1, h2, h3, h4, h5, h6, h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
-    font-family: "Besley", serif;
-    color: var(--color-major);
-}
-
-h1 {
-    font-weight: bold;
-    font-size: min(4em, 8dvw);
-}
-
-h3 {
-    font-size: min(1.8em, 6dvw);
+@media (max-width: calc(40em + 2em + 15px)) {
+    body {
+        margin: 0;
+        height: 100dvh;
+    }
 }
 
 body {
@@ -40,6 +33,20 @@ body {
 
 body > div {
     max-height: 100%;
+}
+
+h1, h2, h3, h4, h5, h6, h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
+    font-family: "Besley", serif;
+    color: var(--color-major);
+}
+
+h1 {
+    font-weight: bold;
+    font-size: min(4em, 8dvw);
+}
+
+h3 {
+    font-size: min(1.8em, 6dvw);
 }
 
 p, a, ul, button, input {

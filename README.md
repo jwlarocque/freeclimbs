@@ -5,14 +5,13 @@ Free and open source route book for home climbing and spray walls.
 ## Roadmap
 
 Launch:
-- Move controls toggle inline with tabs, hide wall name on mobile
 - Styling
+    - Reduce use of :global
     - Unify?
     - Buttons
-- Add Wall Select (home page)
+- Improve Wall Select/home page
 - Sets
     - Clone Set as draft
-    - Edit existing (draft) Sets
 - Sharing links
     - QR codes
 - Sends, ratings, and climber grades
@@ -54,6 +53,7 @@ Planned:
 - Svelte 5
 - transformers.js v3 / WebGPU, batch segmentation
 - Projector mode (use a projector to light holds directly on the wall)
+- Mirror mode (left/right symmetry)
 
 Under Consideration:
 - upgrade hold detection to yolov9 (https://github.com/WongKinYiu/YOLO/)

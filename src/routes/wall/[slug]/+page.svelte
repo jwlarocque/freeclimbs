@@ -238,6 +238,7 @@
         color: var(--color-background);
         margin: 0;
         text-align: center;
+        font-size: min(1.2em, 6dvw);
     }
 
     @media (max-width: calc(40em + 2em + 15px)) {

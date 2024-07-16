@@ -65,7 +65,7 @@
         border-radius: 50%;
         border: var(--inset) solid var(--color-background);
         box-sizing: border-box;
-        background-color: var(--color-background);
+        background-color: var(--color-major);
         transition: background-color 0.1s ease-in-out;
         top: 0.25em;
         left: 0;
@@ -74,7 +74,7 @@
     }
 
     :global(.slider-thumb:hover) {
-        background-color: var(--color-major);
+        background-color: var(--color-hover-background);
     }
 
     :global(.slider-tick) {
