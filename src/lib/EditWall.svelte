@@ -2,6 +2,7 @@
 	import ConfirmModal from "./ConfirmModal.svelte";
 	import LoadingEllipsis from "./LoadingEllipsis.svelte";
 	import RadioInput from "./RadioInput.svelte";
+	import SharingList from "./SharingList.svelte";
 	import TextInput from "./TextInput.svelte";
 	import { pb } from "./pocketbase";
 
@@ -30,6 +31,11 @@
 </script>
 
 <style>
+    hr {
+        margin: 1em;
+        box-sizing: border-box;
+    }
+
     form {
         display: grid;
         max-width: 100%;
@@ -50,7 +56,7 @@
     }
 
     .danger {
-        margin-top: 5em;
+        margin-top: 1em;
     }
 
     :global(.danger > button) {
@@ -115,9 +121,12 @@
         <p class="minor">Error: {errorMessage}</p>
     {/if}
 </form>
+<hr/>
+<SharingList wallId={wall.id}/>
+<hr/>
 <!-- TODO: better styling -->
 <div class="danger">
-    <ConfirmModal buttonText="Delete" buttonClass="buttonDeleteInverse" title={`Delete ${wall.name} ?`}>
+    <ConfirmModal buttonText="Delete Wall" buttonClass="buttonDeleteInverse" title={`Delete ${wall.name} ?`}>
         <div slot="message">
             <p>This will also delete this wall's Sets and Routes, and there's no going back.</p>
         </div>

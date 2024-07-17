@@ -170,8 +170,8 @@
       }
     ],
     "indexes": [],
-    "listRule": "// public wall and not draft\n(set.wall.public = true && draft = false)\n// or requestor is wall owner\n|| set.wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = id\n    && @collection.users_shares.banned = false)",
-    "viewRule": "// public wall and not draft\n(set.wall.public = true && draft = false)\n// or requestor is wall owner\n|| set.wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = id\n    && @collection.users_shares.banned = false)",
+    "listRule": "// public wall and not draft\n(set.wall.public = true && draft = false)\n// or requestor is wall owner\n|| set.wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = set.wall.id\n    && @collection.users_shares.banned = false)",
+    "viewRule": "// public wall and not draft\n(set.wall.public = true && draft = false)\n// or requestor is wall owner\n|| set.wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = set.wall.id\n    && @collection.users_shares.banned = false)",
     "createRule": "// must be authenticated\n@request.auth.id != \"\"\n// must have self as setter\n&& @request.auth.id = setter\n// set must not be a draft\n&& set.draft = false\n&& (\n  // public wall\n  set.wall.public = true\n  // or requestor is wall owner\n  || set.wall.owner = @request.auth.id\n  // or shared with editing privileges\n  || (draft = false\n      && @request.auth.id = @collection.users_shares.user.id\n      && @collection.users_shares.share.wall.id = set.wall.id\n      && @collection.users_shares.banned = false\n      && @collection.shares.id = @collection.users_shares.share.id\n      && @collection.shares.editing = true)\n)",
     "updateRule": "// only drafts can be updated, and only by the setter\ndraft = true && setter = @request.auth.id\n// the setter cannot be changed\n&& (@request.auth.id = @request.data.setter || @request.data.setter = null)",
     "deleteRule": "// wall owner and setter can delete\nset.wall.owner = @request.auth.id || setter = @request.auth.id",
@@ -346,8 +346,8 @@
       }
     ],
     "indexes": [],
-    "listRule": "// public wall, not a draft\n(wall.public = true && draft = false)\n// or requestor is wall owner\n|| wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = id\n    && @collection.users_shares.banned = false)",
-    "viewRule": "// public wall, not a draft\n(wall.public = true && draft = false)\n// or requestor is wall owner\n|| wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = id\n    && @collection.users_shares.banned = false)",
+    "listRule": "// public wall, not a draft\n(wall.public = true && draft = false)\n// or requestor is wall owner\n|| wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = wall.id\n    && @collection.users_shares.banned = false)",
+    "viewRule": "// public wall, not a draft\n(wall.public = true && draft = false)\n// or requestor is wall owner\n|| wall.owner = @request.auth.id\n// or shared\n|| (draft = false\n    && @request.auth.id = @collection.users_shares.user.id\n    && @collection.users_shares.share.wall.id = wall.id\n    && @collection.users_shares.banned = false)",
     "createRule": "// only wall owner can create sets (for now)\nwall.owner = @request.auth.id",
     "updateRule": "// only wall owner can update sets, and only if the set is a draft\ndraft = true && wall.owner = @request.auth.id",
     "deleteRule": "// only wall owner can delete sets (for now)\nwall.owner = @request.auth.id",
@@ -390,7 +390,7 @@
     "listRule": "wall.owner = @request.auth.id",
     "viewRule": "wall.owner = @request.auth.id",
     "createRule": "wall.owner = @request.auth.id",
-    "updateRule": "wall.owner = @request.auth.id",
+    "updateRule": "wall.owner = @request.auth.id\n&& @request.data.wall.id = wall.id",
     "deleteRule": "wall.owner = @request.auth.id",
     "options": {}
   },

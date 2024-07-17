@@ -10,6 +10,8 @@
     export let cancelText = "Cancel";
     export let onConfirm: () => void;
     export let onCancel: () => void;
+
+    let open:boolean;
 </script>
 
 <style>
@@ -25,11 +27,19 @@
         gap: 1em;
         margin: 1em 0 0 0;
     }
+
+    :global(.confirmModalButton) {
+        margin: auto;
+    }
 </style>
 
-<Dialog.Root>
-    <Dialog.Trigger class={buttonClass || "buttonLight"}>
-        <p>{buttonText}</p>
+<Dialog.Root bind:open>
+    <Dialog.Trigger class={"confirmModalButton " + (buttonClass || "buttonLight")}>
+        {#if buttonText}
+            <p>{buttonText}</p>
+        {:else}
+            <slot name="button"/>
+        {/if}
     </Dialog.Trigger>
     <Dialog.Portal>
         <Dialog.Overlay class="modalOverlay"/>
@@ -42,7 +52,7 @@
             </header>
             <slot name="message"/>
             <footer>
-                <Dialog.Close>
+                <Dialog.Close class={buttonClass || "buttonLight"}>
                     <slot name="confirm"/>
                 </Dialog.Close>
             </footer>
