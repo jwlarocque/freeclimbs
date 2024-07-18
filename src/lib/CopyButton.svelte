@@ -3,6 +3,7 @@
     import CheckIcon from "./icons/CheckIcon.svelte";
 
     export let value:string;
+    export let buttonClass:string = "buttonLight"
 
     let copied = false;
 
@@ -26,7 +27,7 @@
     }
 </style>
 
-<button class="buttonDark" on:click={copy}>
+<button class={buttonClass} on:click={copy}>
     {#if copied}
         <CheckIcon/>
     {:else}

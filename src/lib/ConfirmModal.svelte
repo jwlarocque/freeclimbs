@@ -5,11 +5,6 @@
     export let buttonText = "";
     export let buttonClass;
     export let title = "";
-    export let message = "";
-    export let confirmText = "Confirm";
-    export let cancelText = "Cancel";
-    export let onConfirm: () => void;
-    export let onCancel: () => void;
 
     let open:boolean;
 </script>
@@ -30,6 +25,10 @@
 
     :global(.confirmModalButton) {
         margin: auto;
+    }
+
+    :global(.confirmModalButton > span:has(svg)) {
+        line-height: 0;
     }
 </style>
 
@@ -52,9 +51,9 @@
             </header>
             <slot name="message"/>
             <footer>
-                <Dialog.Close class={buttonClass || "buttonLight"}>
+                <span on:click={() => open = false} on:keypress={() => open = false} role="button" tabindex="-1">
                     <slot name="confirm"/>
-                </Dialog.Close>
+                </span>
             </footer>
         </Dialog.Content>
     </Dialog.Portal>

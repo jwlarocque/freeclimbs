@@ -7,6 +7,7 @@
 	import ChevronDownIcon from "./icons/ChevronDownIcon.svelte";
 	import { onMount } from "svelte";
 	import CopyButton from "./CopyButton.svelte";
+	import CheckIcon from "./icons/CheckIcon.svelte";
 
     export let wallId;
 
@@ -20,6 +21,7 @@
         });
     }
 
+    // TODO: don't refresh the whole list on every change
     async function refreshShares() {
         sharesPromise = getShares(wallId);
     }
@@ -34,6 +36,7 @@
         color: black;
         font-size: 1.2em;
         text-align: center;
+        margin-top: 0;
     }
 
     .sharing {
@@ -42,15 +45,15 @@
 
     .shares {
         display: grid;
-        grid-template-columns: 2fr 2fr 0fr;
+        grid-template-columns: auto auto auto auto;
         align-items: center;
         justify-items: start;
-        gap: 1em;
+        gap: var(--inset);
     }
 
     .share {
         display: grid;
-        grid-column: span 3;
+        grid-column: span 4;
         grid-template-columns: subgrid;
         justify-items: center;
         border-radius: var(--primary-radius);
@@ -59,25 +62,31 @@
 
     .share button, .sharing button {
         margin: auto;
+        box-sizing: border-box;
     }
 
-    .users {
-        grid-column: span 3;
-        width: 100%;
-    }
-
-    .users > button {
-        width: 100%;
-        margin: 0;
+    .editingButton {
         display: flex;
         flex-direction: row;
         justify-content: space-between;
         align-items: center;
-        margin: 5px 0;
+        gap: 0.5em;
     }
 
-    .users span {
-        transition: rotate 1s ease-in-out;
+    .checkbox {
+        color: transparent;
+        border: 1px solid var(--color-minor);
+        border-radius: 5px;
+        line-height: 0;
+    }
+
+    .checkbox.checked {
+        color: black;
+    }
+
+    #newShare {
+        margin-top: 1em;
+        width: 100%;
     }
 </style>
 
@@ -94,16 +103,33 @@
                     <div class="share">
                         <div style="display: flex; flex-direction: row;">
                             <a href={`/share/${share.id}`}><p>Sharing Link</p></a>
-                            <CopyButton value={`${window.location.origin}/share/${share.id}`}/>
+                            <CopyButton value={`${window.location.origin}/share/${share.id}`} buttonClass="buttonDark"/>
                         </div>
                         <button
-                            class="buttonDark"
-                            title="{share.editing ? 'Disallow' : 'Allow'} setting"
+                            class="buttonDark editingButton"
+                            title="{share.editing ? 'Disallow' : 'Allow'} Setting"
                             on:click={async () => {await setShareEditing(share, !share.editing); refreshShares();}}
                         >
-                            Allows: {share.editing ? "setting" : "viewing"}
+                            <span class={share.editing ? "checkbox checked" : "checkbox"}>
+                                <CheckIcon/>
+                            </span>
+                            Allow Setting
                         </button>
-                        <!-- TODO: FIX DELETE - the nested buttons are not okay -->
+                        <ConfirmModal buttonClass="buttonDark" title="Users of this link">
+                            <span slot="button" title="View Users">
+                                {share?.expand?.users_shares_via_share.length || 0} {share?.expand?.users_shares_via_share.length == 1 ? "user" : "users"}
+                            </span>
+                            <div slot="message">
+                                {#if share?.expand?.users_shares_via_share}
+                                    {#each share?.expand?.users_shares_via_share as user_share}
+                                    <!-- TODO: if you ever add usernames/nicknames, show them here -->
+                                        <p>{user_share?.expand?.user?.username} ({user_share?.expand?.user?.email})</p>
+                                    {/each}
+                                {:else}
+                                    <p>No users yet.</p>
+                                {/if}
+                            </div>
+                        </ConfirmModal>
                         <ConfirmModal
                             buttonClass="buttonDelete"
                             title={`Delete sharing link used by ${share?.expand?.users_shares_via_share.length || 0} ${share?.expand?.users_shares_via_share.length == 1 ? "person" : "people"}?`}
@@ -115,21 +141,13 @@
                                 <p>Everyone using this link will lose access until you send them a new one.</p>
                                 <p>This cannot be undone.</p>
                             </div>
-                            <button slot="confirm" class="buttonDelete" on:click={async () => {await deleteShare(share.id); refreshShares();}}>Delete</button>
-                        </ConfirmModal>
-                        <div class="users">
-                            <button class="buttonDark" on:click={() => showUsers[share.id] = !(showUsers[share.id] ?? false)}>
-                                {share?.expand?.users_shares_via_share.length || 0} {share?.expand?.users_shares_via_share.length == 1 ? "user" : "users"}
-                                <span class="{showUsers[share.id] ? "flipped" : ""}">
-                                    <ChevronDownIcon/>
-                                </span>
-                            </button>
-                            {#if showUsers[share.id] && share?.expand?.users_shares_via_share}
-                                {#each share?.expand?.users_shares_via_share as user_share}
-                                    <p>{user_share?.expand?.user?.username}</p>
-                                {/each}
-                            {/if}
-                        </div>
+                            <button
+                                slot="confirm"
+                                class="buttonDelete"
+                                on:click={async () => {await deleteShare(share.id); refreshShares();}}
+                                on:keypress={async () => {await deleteShare(share.id); refreshShares();}}
+                            >Delete</button>
+                        </ConfirmModal> 
                     </div>
                 {/each}
             </div>
@@ -137,5 +155,5 @@
     {:catch error}
         <p>Error: {error.message}</p>
     {/await}
-    <button class="buttonDarkInverse" on:click={async () => {await createShare(wallId, false); refreshShares();}}>New Sharing Link</button>
+    <button id="newShare" class="buttonDarkInverse" on:click={async () => {await createShare(wallId, false); refreshShares();}}>New Sharing Link</button>
 </div>

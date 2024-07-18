@@ -58,11 +58,17 @@ a:hover {
     text-decoration: underline;
 }
 
+span.buttonContainer:has(svg) {
+    line-height: 0;
+}
+
 button, .buttonLight, .buttonDark, .buttonDarkInverse, .buttonDelete {
     border: transparent;
     border-radius: var(--primary-radius);
     font-size: 1.0em;
     line-height: 1;
+    min-height:  2em;
+    min-width: 2em;
     display: flex;
     flex-direction: column;
     justify-content: center;
