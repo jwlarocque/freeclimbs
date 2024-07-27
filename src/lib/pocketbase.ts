@@ -30,6 +30,11 @@ export async function getShares(wallId) {
     return records;
 }
 
+export async function getShare(shareId) {
+    const record = await pb.collection("shares").getOne(shareId);
+    return record;
+}
+
 export async function createShare(wallId, editing) {
     const record = await pb.collection("shares").create({
         wall: wallId,
@@ -41,7 +46,7 @@ export async function createShare(wallId, editing) {
 export async function createUserShare(shareId) {
     const userId = pb.authStore.model?.id;
     if (!userId) {
-        throw new Error("Not logged in");
+        throw new Error("You must be logged in to access a Shared Wall.");
     }
     const record = await pb.collection("users_shares").create({
         user: userId,

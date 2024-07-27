@@ -9,11 +9,10 @@ Launch:
     - Reduce use of :global
     - Unify?
     - Buttons
+    - Use the same checkboxes for Sharing and Route creation
 - Improve Wall Select/home page
 - Sets
     - Clone Set as draft
-- Sharing links
-    - QR codes
 - Sends, ratings, and climber grades
     - Additional route search filtering/sorting based on ratings
 - More auth options (Google at minimum)
@@ -30,13 +29,16 @@ Launch:
     - Banned users (readonly-ify on backend)
 - Bug fixes
     - Controls expand/collapse responsiveness
-    - Empty set list has a page zero
     - Login redirect is broken
     - Weird bug when adding a hold to the editor on mobile?
     - When first set is created, set as current_set? (only if none exists?)
     - Are the certs working properly on birdthing?
     - Check behavior when no walls exist
     - Check routeviewer behavior when holds overlap
+    - Loading image... z-index is higher than modals
+    - Un-load image when selected set is deleted
+    - Un-load route overlay when selected route is deleted
+    - Threshold slider for hold detection
 
 Up Next:
 - More detailed new Set instructions (particularly for error correction step)

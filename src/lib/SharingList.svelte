@@ -102,8 +102,8 @@
                 {#each shares as share, i}
                     <div class="share">
                         <div style="display: flex; flex-direction: row;">
-                            <a href={`/share/${share.id}`}><p>Sharing Link</p></a>
-                            <CopyButton value={`${window.location.origin}/share/${share.id}`} buttonClass="buttonDark"/>
+                            <a href={`/share?secret=${share.id}`}><p>Link</p></a>
+                            <CopyButton value={`${window.location.origin}/share?secret=${share.id}`} buttonClass="buttonDark"/>
                         </div>
                         <button
                             class="buttonDark editingButton"
