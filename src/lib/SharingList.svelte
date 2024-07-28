@@ -8,6 +8,7 @@
 	import { onMount } from "svelte";
 	import CopyButton from "./CopyButton.svelte";
 	import CheckIcon from "./icons/CheckIcon.svelte";
+	import BoolInput from "./BoolInput.svelte";
 
     export let wallId;
 
@@ -73,17 +74,6 @@
         gap: 0.5em;
     }
 
-    .checkbox {
-        color: transparent;
-        border: 1px solid var(--color-minor);
-        border-radius: 5px;
-        line-height: 0;
-    }
-
-    .checkbox.checked {
-        color: black;
-    }
-
     #newShare {
         margin-top: 1em;
         width: 100%;
@@ -105,16 +95,13 @@
                             <a href={`/share?secret=${share.id}`}><p>Link</p></a>
                             <CopyButton value={`${window.location.origin}/share?secret=${share.id}`} buttonClass="buttonDark"/>
                         </div>
-                        <button
-                            class="buttonDark editingButton"
-                            title="{share.editing ? 'Disallow' : 'Allow'} Setting"
-                            on:click={async () => {await setShareEditing(share, !share.editing); refreshShares();}}
-                        >
-                            <span class={share.editing ? "checkbox checked" : "checkbox"}>
-                                <CheckIcon/>
-                            </span>
-                            Allow Setting
-                        </button>
+                        <span class="editingButton">
+                            <BoolInput
+                                value={share.editing}
+                                title="{share.editing ? 'Disallow' : 'Allow'} Setting"
+                                onValueChange={async (editing) => {await setShareEditing(share, editing); refreshShares();}}/>
+                            <p>Allow Setting</p>
+                        </span>
                         <ConfirmModal buttonClass="buttonDark" title="Users of this link">
                             <span slot="button" title="View Users">
                                 {share?.expand?.users_shares_via_share.length || 0} {share?.expand?.users_shares_via_share.length == 1 ? "user" : "users"}

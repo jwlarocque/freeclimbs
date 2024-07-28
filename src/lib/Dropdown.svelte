@@ -4,11 +4,14 @@
     export let prefix = "";
     export let options = [];
     export let selected;
+    export let buttonClass = "buttonDark";
+    export let defaultLabel = "";
 </script>
 
 <style>
     :global(.dropdown) {
         background-color: var(--color-major);
+        color: black;
         z-index: 2;
     }
 
@@ -18,8 +21,8 @@
 </style>
 
 <Select.Root items={options} bind:selected={selected}>
-    <Select.Trigger class="buttonDark">
-        <p>{prefix}{selected.label}</p>
+    <Select.Trigger class={buttonClass}>
+        <p>{prefix}{selected?.label || defaultLabel}</p>
     </Select.Trigger>
     <Select.Content class="dropdown">
         {#each options as option}
