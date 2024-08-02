@@ -237,7 +237,7 @@
     {#if setImgLoaded}
         <div id="controls" class="infoBox">
             <button
-                on:click={() => {panzoomEnabled = !panzoomEnabled; if (panzoomEnabled) { panzoom.resume(); } else { panzoom.pause(); }}}
+                on:click|stopPropagation={() => {panzoomEnabled = !panzoomEnabled; if (panzoomEnabled) { panzoom.resume(); } else { panzoom.pause(); }}}
                 title="{panzoomEnabled ? "Disable Panning" : "Enable Panning"}"
             >
                 {#if panzoomEnabled}

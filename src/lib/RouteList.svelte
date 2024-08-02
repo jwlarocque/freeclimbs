@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { authStore, pb } from "$lib/pocketbase";
+    import { authStore, pb, userSettingsStore } from "$lib/pocketbase";
     import { Pagination, Select } from "bits-ui";
 	import LoadingEllipsis from "./LoadingEllipsis.svelte";
 	import ConfirmModal from "./ConfirmModal.svelte";
@@ -10,14 +10,14 @@
 	import Dropdown from "./Dropdown.svelte";
     import GradeSlider from "./GradeSlider.svelte";
 	import { last } from "@melt-ui/svelte/internal/helpers";
-    import {grades} from "./grades";
+    import { grades } from "./grades";
 
     export let set;
     export let selectedRoute;
     export let creatingRoute;
 
     const today = new Date();
-    const SYSTEM = "v";
+    $: system = $userSettingsStore?.grading_system || "v";
     const PAGE_SIZE = 30;
     const SORT_OPTIONS = [
         {value: "created", label: "Date Created"},
@@ -89,7 +89,6 @@
         if (pagesRoutes[page]) {
             return pagesRoutes[page];
         }
-        console.log(`set="${set.id}" && ${filterSelected.value}`);
         const records = await pb.collection("routes").getList(
             page, PAGE_SIZE, {
                 sort: `-draft,${desc ? "-" : ""}${sortSelected.value}`,
@@ -276,7 +275,7 @@
                             {/if}
                             {route.name}
                         </p>
-                        <p>{grades[route.setter_grade][SYSTEM]}</p>
+                        <p>{grades[route.setter_grade][system]}</p>
                         <div class="ownerActions">
                             {#if route.setter == $authStore.model?.id}
                                 {#if route.draft}

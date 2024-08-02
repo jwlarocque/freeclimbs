@@ -6,6 +6,7 @@
     export let selected;
     export let buttonClass = "buttonDark";
     export let defaultLabel = "";
+    export let onChange = (x) => {};
 </script>
 
 <style>
@@ -20,7 +21,7 @@
     }
 </style>
 
-<Select.Root items={options} bind:selected={selected}>
+<Select.Root items={options} bind:selected={selected} onSelectedChange={onChange}>
     <Select.Trigger class={buttonClass}>
         <p>{prefix}{selected?.label || defaultLabel}</p>
     </Select.Trigger>

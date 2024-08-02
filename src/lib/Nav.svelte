@@ -3,6 +3,7 @@
 	import LoginModal from "./LoginModal.svelte";
     import { pb, authStore } from './pocketbase';
 	import NewWall from "./NewWall.svelte";
+	import SettingsModal from "./SettingsModal.svelte";
 
     async function logout() {
         await pb.authStore.clear();
@@ -45,6 +46,7 @@
     <div>
         {#if $authStore.isValid}
             <NewWall isNew={true}/>
+            <SettingsModal buttonText="Settings" buttonClass="buttonLight" title="Settings"></SettingsModal>
             <button class="buttonLight" on:click={logout}><p>Log Out</p></button>
         {:else}
             <LoginModal/>

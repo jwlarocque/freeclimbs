@@ -2,19 +2,25 @@
 	import { Slider } from "bits-ui";
     import { grades } from "./grades";
     import debounce from "$lib/debounce";
+	import { userSettingsStore } from "./pocketbase";
 
-    const SYSTEM = "v";
-    const UNIQUE_GRADES = grades.filter((grade, index, self) => self.findIndex(g => g[SYSTEM] === grade[SYSTEM]) === index);
-
-    let internalValue = [0, UNIQUE_GRADES.length - 1];
-
+    let system = "v";
+    let unique_grades = grades.filter((grade, index, self) => self.findIndex(g => g[system] === grade[system]) === index);
+    let internalValue = [0, unique_grades.length - 1];
+    $: if ($userSettingsStore?.grading_system != system) {
+        system = $userSettingsStore?.grading_system;
+        unique_grades = grades.filter((grade, index, self) => self.findIndex(g => g[system] === grade[system]) === index);
+        internalValue = [0, unique_grades.length - 1];
+    }
+    
     export let externalValue = internalValue;
+    $: console.log(externalValue);
 
     const debouncedSetValue = debounce((value) => {
         // set lower bound to index of first occurence of grade[SYSTEM] in grades
-        externalValue[0] = grades.findIndex(grade => grade[SYSTEM] === UNIQUE_GRADES[value[0]][SYSTEM]);
+        externalValue[0] = grades.findIndex(grade => grade[system] === unique_grades[value[0]][system]);
         // set upper bound to index of last occurence of grade[SYSTEM] in grades
-        externalValue[1] = grades.findLastIndex(grade => grade[SYSTEM] === UNIQUE_GRADES[value[1]][SYSTEM]);
+        externalValue[1] = grades.findLastIndex(grade => grade[system] === unique_grades[value[1]][system]);
     }, 200);
 
     $: debouncedSetValue(internalValue);
@@ -90,13 +96,13 @@
 </style>
 
 {#if internalValue[0] == internalValue[1]}
-    <p>{UNIQUE_GRADES[internalValue[0]][SYSTEM]}</p>
+    <p>{unique_grades[internalValue[0]][system]}</p>
 {:else}
-    <p>{UNIQUE_GRADES[internalValue[0]][SYSTEM]} - {UNIQUE_GRADES[internalValue[1]][SYSTEM]}</p>
+    <p>{unique_grades[internalValue[0]][system]} - {unique_grades[internalValue[1]][system]}</p>
 {/if}
 <Slider.Root
     min={0}
-    max={UNIQUE_GRADES.length - 1}
+    max={unique_grades.length - 1}
     step={1}
     bind:value={internalValue}
     let:thumbs

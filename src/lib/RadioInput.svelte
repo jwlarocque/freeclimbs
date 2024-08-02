@@ -4,6 +4,7 @@
     export let options;
     export let value;
     export let buttonClass: string = "light";
+    export let direction = "row";
 
     let intermediaryValue = value;
 

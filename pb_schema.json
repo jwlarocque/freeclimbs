@@ -395,6 +395,56 @@
     "options": {}
   },
   {
+    "id": "g4urm5klan3mcmu",
+    "name": "user_settings",
+    "type": "base",
+    "system": false,
+    "schema": [
+      {
+        "system": false,
+        "id": "zlon5py3",
+        "name": "user",
+        "type": "relation",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "collectionId": "_pb_users_auth_",
+          "cascadeDelete": true,
+          "minSelect": null,
+          "maxSelect": 1,
+          "displayFields": null
+        }
+      },
+      {
+        "system": false,
+        "id": "n42qycb7",
+        "name": "grading_system",
+        "type": "select",
+        "required": false,
+        "presentable": false,
+        "unique": false,
+        "options": {
+          "maxSelect": 1,
+          "values": [
+            "v",
+            "font",
+            "dankyu"
+          ]
+        }
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_NQaVAAZ` ON `user_settings` (`user`)"
+    ],
+    "listRule": "@request.auth.id = user",
+    "viewRule": "@request.auth.id = user",
+    "createRule": "@request.auth.id = user",
+    "updateRule": "@request.auth.id = user",
+    "deleteRule": null,
+    "options": {}
+  },
+  {
     "id": "cnc2ffzm7f4abgq",
     "name": "users_shares",
     "type": "base",
@@ -461,7 +511,7 @@
     ],
     "listRule": "// only you\n@request.auth.id = user.id\n// and the wall owner\n|| @request.auth.id = share.wall.owner.id",
     "viewRule": "// only you\n@request.auth.id = user.id\n// and the wall owner\n|| @request.auth.id = share.wall.owner.id",
-    "createRule": "// can only create shares with yourself, and only if you have the share id\n@request.query.share_id = share.id\n&& @request.auth.id = user.id\n&& banned = false // can't ban yourself",
+    "createRule": "// can only create shares with yourself\n@request.auth.id = user.id\n&& banned = false // can't ban yourself",
     "updateRule": "// only you (but you can't modify your ban status)\n(@request.auth.id = user.id && @request.data.banned = banned)\n// and the wall owner\n|| @request.auth.id = share.wall.owner.id",
     "deleteRule": null,
     "options": {}

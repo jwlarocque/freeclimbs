@@ -6,9 +6,34 @@ import PocketBase from 'pocketbase';
 export const pb = new PocketBase('/');
 
 export const authStore = writable(pb.authStore);
+export const userSettingsStore = writable(null);
 
-pb.authStore.onChange((auth) => {
+pb.authStore.onChange(async (auth) => {
     authStore.set(pb.authStore);
+    initUserSettings();
+}, true);
+
+async function initUserSettings() {
+    if (pb.authStore.isValid) {
+        let userSettings;
+        try {
+            userSettings = await pb.collection("user_settings").getFirstListItem(`user = '${pb.authStore.model.id}'`);
+        } catch (e) {
+            console.log(e);
+            userSettings = await pb.collection("user_settings").create({
+                user: pb.authStore.model.id,
+                grading_system: "v"
+            });
+        }
+        userSettingsStore.set(userSettings);
+        console.log(userSettings);
+    }
+}
+
+userSettingsStore.subscribe(async (settings) => {
+    if (pb.authStore.isValid && settings) {
+        await pb.collection("user_settings").update(settings.id, settings);
+    }
 });
 
 export async function loadSet(setId) {
@@ -54,6 +79,14 @@ export async function createUserShare(shareId) {
         banned: false,
         last_accessed: new Date()
     });
+    return record;
+}
+
+export async function getSettingUserShare(userId, wallId) {
+    const record = await pb.collection("users_shares").getFirstListItem(
+        `user = '${userId}' && share.wall.id = '${wallId}' && share.editing = True && banned = False`
+    );
+    console.log(record);
     return record;
 }
 

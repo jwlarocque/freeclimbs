@@ -30,3 +30,9 @@ export const grades = [
     {id: 28, v: "V16", font: "8C+", dankyu: "5 dan"},
     {id: 29, v: "V17", font: "9A",  dankyu: "5 dan"},
 ];
+
+export const systems = [
+    {label: "V/Hueco", value: "v"},
+    {label: "Font", value: "font"},
+    {label: "Dankyu", value: "dankyu"}
+]

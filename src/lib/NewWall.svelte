@@ -16,7 +16,6 @@
         "owner": pb.authStore.model?.id
     };
     export let onUpdate = () => {};
-    $: console.log(data);
     let awaitingCreate = false;
     let errorMessage;
     let modalOpen = false;
@@ -70,13 +69,13 @@
         font-size: 1em;
     }
 
-    :global(.modalContent p) {
+    :global(.modalContent form p) {
         font-size: 1.2em;
         color: var(--color-major);
         margin: 0;
     }
 
-    :global(.modalContent p.minor) {
+    :global(.modalContent form p.minor) {
         color: var(--color-minor);
         font-size: 0.9em;
     }

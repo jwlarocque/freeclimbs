@@ -18,7 +18,6 @@
     let currPage = 1;
     let pagesSets = {};
     let sets;
-    $: console.log(sets);
     $: if (currPage) {
         sets = loadSets(currPage);
     }
@@ -42,7 +41,6 @@
         if (wall?.expand?.current_set?.id) {
             tempSets.unshift(wall.expand.current_set);
         }
-        console.log(tempSets);
         pagesSets[page] = tempSets;
         return tempSets;
     }

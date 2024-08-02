@@ -51,7 +51,7 @@
         gap: 1em;
         margin: auto;
         font-size: 1em;
-        width: 100%;
+        margin: 1em;
     }
 
     .buttonGroup {
@@ -67,24 +67,32 @@
     }
 </style>
 
-<form>
-    <p>Add Holds</p>
-    <!-- TODO: style these radio buttons to match RouteViewer hold outlines -->
-    <RadioInput
-        options={[{label: "Start", value: "start"}, {label: "Finish", value: "finish"}, {label: "Normal", value: "holds"}]}
-        bind:value={newHoldType}
-        buttonClass="dark"
-    />
-    <p>Name</p>
-    <TextInput bind:value={selectedRoute.name}/>
-    <p>Setter Grade</p>
-    <GradeSelect bind:selectedGrade={selectedRoute.setter_grade}/>
-    <p>Free Feet</p>
-    <BoolInput bind:value={selectedRoute.free_feet}/>
-    <p>Top Out</p>
-    <BoolInput bind:value={selectedRoute.top_out}/>
-</form>
+{#if selectedRoute}
+    <form>
+        <p>Add Holds</p>
+        <!-- TODO: style these radio buttons to match RouteViewer hold outlines -->
+        <RadioInput
+            options={[{label: "Start", value: "start"}, {label: "Finish", value: "finish"}, {label: "Normal", value: "holds"}]}
+            bind:value={newHoldType}
+            buttonClass="dark"
+        />
+        <p>Name</p>
+        <TextInput bind:value={selectedRoute.name}/>
+        <p>Setter Grade</p>
+        <GradeSelect bind:selectedGrade={selectedRoute.setter_grade}/>
+        <p>Free Feet</p>
+        <BoolInput bind:value={selectedRoute.free_feet}/>
+        <p>Top Out</p>
+        <BoolInput bind:value={selectedRoute.top_out}/>
+    </form>
+{/if}
 <div class="buttonGroup">
+    <button
+        class="buttonDarkInverse"
+        on:click={() => {creatingRoute = false; selectedRoute = null;}}
+    >
+        Cancel
+    </button>
     <button
         class="buttonDarkInverse"
         on:click={() => createUpdateRoute(true)}

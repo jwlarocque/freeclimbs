@@ -11,7 +11,7 @@
 	import RouteViewer from '$lib/RouteViewer.svelte';
 	import SetList from '$lib/SetList.svelte';
 	import ChevronDownIcon from '$lib/icons/ChevronDownIcon.svelte';
-    import { pb, authStore, loadSet, loadRoute } from '$lib/pocketbase.ts';
+    import { pb, authStore, loadSet, loadRoute, getSettingUserShare } from '$lib/pocketbase.ts';
     import { Tabs } from 'bits-ui';
 
     export let data;
@@ -22,6 +22,7 @@
     let lastSelectedSet;
     let selectedRoute;
     let lastSelectedRouteId;
+    let mayCreateRoute = false;
     let creatingRoute = false;
     let newHoldType = "holds";
     const holdsTypes = ["start", "finish", "holds"];
@@ -111,6 +112,7 @@
     }
 
     async function loadWall() {
+        // TODO: way too many API calls here; SSR?
         const record = await pb.collection("walls").getOne(
             data.slug, {
                 expand: "current_set"
@@ -125,6 +127,18 @@
         }
         if ($page.url.searchParams.get("route")) {
             selectedRoute = await loadRoute($page.url.searchParams.get("route"));
+        }
+        if ($authStore.isValid) {
+            if ($authStore.model?.id == record?.owner || $authStore.isAdmin) {
+                mayCreateRoute = true;
+            } else {
+                try {
+                    let mayCreateRouteRecord = await getSettingUserShare($authStore.model?.id, record.id);
+                    if (mayCreateRouteRecord) {
+                        mayCreateRoute = true;
+                    }
+                } catch (e) {} // not allowed to create routes; no problem
+            }
         }
         wallName = record?.name;
         return record;
@@ -203,7 +217,11 @@
 
     :global(.tabContainer) {
         overflow-y: auto;
-        padding-bottom: 2em;
+    }
+
+    #containerPadding {
+        height: 2em;
+        width: 100%;
     }
 
     :global(.tabPanel > div) {
@@ -319,7 +337,6 @@
                         <!-- TODO: put all this in a component -->
                         <div>
                             {#if creatingRoute}
-                                <button class="buttonDarkInverse" on:click={() => {creatingRoute = false; selectedRoute = null;}}>Cancel</button>
                                 <!-- TODO: too many bound props, awk -->
                                 <NewRoute selectedSet={selectedSet} bind:newHoldType bind:selectedRoute bind:creatingRoute/>
                             {:else}
@@ -327,8 +344,9 @@
                                 <RouteList set={selectedSet} bind:selectedRoute bind:creatingRoute/>
                                 <!-- TODO: this button needs to go somewhere else -->
                                 <!-- TODO: auth check for more complex authorization setups -->
-                                {#if $authStore.isValid && selectedSet}
+                                {#if $authStore.isValid && selectedSet && mayCreateRoute}
                                     <button class="buttonDarkInverse" id="newRoute" on:click={() => {creatingRoute = true; resetRoute();}}>New Route</button>
+                                    <div id="containerPadding"></div>
                                 {/if}
                             {/if}
                         </div>

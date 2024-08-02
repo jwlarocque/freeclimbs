@@ -4,12 +4,17 @@
 	import ChevronDownIcon from './icons/ChevronDownIcon.svelte';
     import { grades } from './grades';
     import { createSelect, melt } from '@melt-ui/svelte'
+	import { userSettingsStore } from './pocketbase';
 
     export let selectedGrade:number;
     $: selectedGrade = Number($selected?.value);
 
-    const mode = "v";
+    let system = "v";
     let options = buildGradeOptions();
+    $: if ($userSettingsStore?.grading_system != system) {
+        system = $userSettingsStore?.grading_system;
+        options = buildGradeOptions();
+    }
 
     const {
         elements: { trigger, menu, option, group, groupLabel, label },
@@ -27,7 +32,7 @@
 
     function buildGradeOptions() {
         let options = [];
-        let groups = Object.groupBy(grades, (e, i) => e[mode]);
+        let groups = Object.groupBy(grades, (e, i) => e[system]);
         for (let label in groups) {
             let selectedGradeI = groups[label].findIndex((e) => e.id == selectedGrade)
             // if the selected grade is in this group, use that grade as the
