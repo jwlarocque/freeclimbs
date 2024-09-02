@@ -1,6 +1,6 @@
 # Freeclimbs
 
-Free and open source route book for home climbing and spray walls. 
+Free and open source route book for home climbing and spray walls.
 
 ## Roadmap
 
@@ -28,6 +28,7 @@ Launch:
 - Moderation
     - Banned users (readonly-ify on backend)
 - Bug fixes
+    - GradeSlider doesn't respect rating system setting?
     - Controls expand/collapse responsiveness
     - Login redirect is broken
     - Weird bug when adding a hold to the editor on mobile?
