@@ -1,0 +1,6 @@
+@font-face {
+	font-family: 'Cooper';
+	font-style: normal;
+	src: url('/fonts/Cooper[wght].woff2') format('woff2');
+	font-display: swap;
+}

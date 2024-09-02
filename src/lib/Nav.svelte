@@ -1,55 +1,58 @@
-<script lang="ts">
-    import PocketBase from "pocketbase";
-	import LoginModal from "./LoginModal.svelte";
-    import { pb, authStore } from './pocketbase';
-	import NewWall from "./NewWall.svelte";
-	import SettingsModal from "./SettingsModal.svelte";
-
-    async function logout() {
-        await pb.authStore.clear();
-        pb.authStore = pb.authStore;
-    }
+<script>
+	import Dialog from '$lib/Dialog.svelte';
+	import { auth, listAuthProviders, login, logout } from '$lib/pocketbase.svelte.ts';
+	import Loading from './Loading.svelte';
+	import { navTitle } from '../routes/global.svelte';
 </script>
 
-<style>
-    nav {
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-        gap: min(1em, 2dvw);
-        align-items: center;
-        flex-wrap: wrap;
-    }
-
-    nav > div {
-        display: flex;
-        flex-direction: row;
-        justify-content: flex-end;
-        flex-wrap: wrap;
-        gap: min(1em, 2dvw);
-    }
-
-    h1 {
-        margin: 0;
-        padding: 0;
-        line-height: 1;
-    }
-
-    a {
-        color: var(--color-major);
-        text-decoration: none;
-    }
-</style>
-
 <nav>
-    <a href="/"><h1>Freeclimbs</h1></a>
-    <div>
-        {#if $authStore.isValid}
-            <NewWall isNew={true}/>
-            <SettingsModal buttonText="Settings" buttonClass="buttonLight" title="Settings"></SettingsModal>
-            <button class="buttonLight" on:click={logout}><p>Log Out</p></button>
-        {:else}
-            <LoginModal/>
-        {/if}
-    </div>
+	<h1>Freeclimbs{navTitle?.suffix ? ` - ${navTitle.suffix}` : ''}</h1>
+	{#if auth?.model}
+		<button class="buttonTransparent" onclick={() => logout()}>Log Out</button>
+	{:else}
+		<Dialog>
+			{#snippet button(open)}
+				<button class="buttonTransparent" onclick={() => open.set(true)}>Log In</button>
+			{/snippet}
+			{#snippet contents(open)}
+				<h3>Log In</h3>
+				<div id="providers">
+					{#await listAuthProviders()}
+						<p>Loading<Loading active={true} /></p>
+					{:then providers}
+						{#each providers as provider}
+							<button class="buttonTransparent" onclick={() => login(provider.name)}
+								>{provider.displayName}</button
+							>
+						{/each}
+					{:catch error}
+						<p>Error: {error}</p>
+					{/await}
+				</div>
+			{/snippet}
+		</Dialog>
+	{/if}
 </nav>
+
+<style>
+	nav {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	h1 {
+		margin: 0;
+	}
+
+	#providers {
+		display: flex;
+		flex-direction: column;
+		gap: 1em;
+		align-items: center;
+	}
+
+	#providers button {
+		width: 100%;
+	}
+</style>

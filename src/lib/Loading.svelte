@@ -1,5 +1,8 @@
-<script>
-    export let active = true;
+<script lang="ts">
+    type Props = {
+        active: boolean;
+    }
+    let { active }: Props = $props();
 </script>
 
 <style>

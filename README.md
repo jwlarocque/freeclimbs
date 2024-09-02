@@ -1,67 +1,38 @@
-# Freeclimbs
+# create-svelte
 
-Free and open source route book for home climbing and spray walls. 
+Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).
 
-## Roadmap
+## Creating a project
 
-Launch:
-- Styling
-    - Reduce use of :global
-    - Unify?
-    - Buttons
-    - Use the same checkboxes for Sharing and Route creation
-- Improve Wall Select/home page
-- Sets
-    - Clone Set as draft
-- Sends, ratings, and climber grades
-    - Additional route search filtering/sorting based on ratings
-- More auth options (Google at minimum)
-    - Fix reload-on-login
-- User settings
-    - Grading system (font/hueco/dankyu)
-    - Username/nickname
-- API rate limiting (just use nginx?)
-- Global admin settings (e.g. disallow Wall creation)
-- GDPR
-    - Don't load fonts from Google
-    - Don't load models from Hugging Face
-- Moderation
-    - Banned users (readonly-ify on backend)
-- Bug fixes
-    - Controls expand/collapse responsiveness
-    - Login redirect is broken
-    - Weird bug when adding a hold to the editor on mobile?
-    - When first set is created, set as current_set? (only if none exists?)
-    - Are the certs working properly on birdthing?
-    - Check behavior when no walls exist
-    - Check routeviewer behavior when holds overlap
-    - Loading image... z-index is higher than modals
-    - Un-load image when selected set is deleted
-    - Un-load route overlay when selected route is deleted
-    - Threshold slider for hold detection
+If you're seeing this, you've probably already done this step. Congrats!
 
-Up Next:
-- More detailed new Set instructions (particularly for error correction step)
-- CI
-- Climber rating aggregation (not just mean)
-    - https://www.evanmiller.org/ranking-items-with-star-ratings.html
-    - pocketbase extension for write-time aggregation
-- More login options
-    - Populate automatically from pocketbase available
-    - Username/password login (disabled in default config)
-- Better updates on navigation, store route search params in URL
+```bash
+# create a new project in the current directory
+npm create svelte@latest
 
-Planned:
-- Svelte 5
-- transformers.js v3 / WebGPU, batch segmentation
-- Projector mode (use a projector to light holds directly on the wall)
-- Mirror mode (left/right symmetry)
+# create a new project in my-app
+npm create svelte@latest my-app
+```
 
-Under Consideration:
-- upgrade hold detection to yolov9 (https://github.com/WongKinYiu/YOLO/)
-- client side hold detection?
-- LED mode/client (most likely raspi + WS2812)
-- Moderation
-    - Shadowbans
-    - Automod for text
-    - Mod queue for images
+## Developing
+
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+
+```bash
+npm run dev
+
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
+```
+
+## Building
+
+To create a production version of your app:
+
+```bash
+npm run build
+```
+
+You can preview the production build with `npm run preview`.
+
+> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
